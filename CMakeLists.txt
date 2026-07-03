@@ -153,13 +153,7 @@ if(PAD_LEN GREATER 0)
 endif()
 
 # Set hex with 0x for substitution
-set(PSL_VERSION_NUMBER "0x${LIBPSL_HEX_VALUE}")
-
-# Set other variables for .in files
-set(PSL_VERSION "${LIBPSL_VERSION}")
-set(PSL_VERSION_MAJOR "${LIBPSL_VERSION_MAJOR}")
-set(PSL_VERSION_MINOR "${LIBPSL_VERSION_MINOR}")
-set(PSL_VERSION_PATCH "${LIBPSL_VERSION_PATCH}")
+set(LIBPSL_VERSION_NUMBER "0x${LIBPSL_HEX_VALUE}")
 
 set(PACKAGE_NAME "libpsl")
 set(PACKAGE_VERSION "${LIBPSL_VERSION}")
@@ -221,7 +215,7 @@ target_compile_definitions(psl PRIVATE
 	# ENABLE_RUNTIME=libidn2
 )
 target_compile_definitions(psl PUBLIC PSL_STATIC)
-target_compile_options(psl PRIVATE -D_CRT_SECURE_NO_WARNINGS)
+target_compile_options(psl PRIVATE -D_CRT_SECURE_NO_WARNINGS -DENABLE_BUILTIN)
 target_include_directories(psl PUBLIC "${PSL_BINARY_DIR}")
 add_dependencies(psl generate_psl_files)
 
@@ -269,44 +263,6 @@ set(ZLIB_INCLUDE_DIR ${zlib_SOURCE_DIR} CACHE PATH "" FORCE)
 
 add_subdirectory(lib/sys/curl EXCLUDE_FROM_ALL)
 
-# ──────────────────────────────────────────────────────────────
-# Workaround: MSVC preprocessor fails to parse chained #if expression
-# in curl/lib/psl.c when building with libpsl, due to a version check
-# We know our libpsl is 0.21.5, so lets just remove the comparison inplace,
-# and later clean it, so we dont leave a dirty submodule. (see restore_and_clean_curl)
-# ──────────────────────────────────────────────────────────────
-set(ORIGINAL_PSL_C "${CMAKE_CURRENT_SOURCE_DIR}/lib/sys/curl/lib/psl.c")
-file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/patch_psl.cmake"
-"file(READ \"${ORIGINAL_PSL_C}\" PSL_C_CONTENT)
-string(REPLACE
-    \"#if defined(PSL_VERSION_NUMBER) && PSL_VERSION_NUMBER >= 0x001000\"
-    \"#if defined(PSL_VERSION_NUMBER)\"
-    PSL_C_CONTENT \"\${PSL_C_CONTENT}\"
-)
-file(WRITE \"${ORIGINAL_PSL_C}\" \"\${PSL_C_CONTENT}\")
-message(STATUS \"Patched curl/lib/psl.c in-place for MSVC compatibility\")
-")
-add_custom_command(
-    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/psl_backup.stamp"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${ORIGINAL_PSL_C}" "${CMAKE_CURRENT_BINARY_DIR}/psl.c.backup"
-    COMMAND ${CMAKE_COMMAND} -E touch "${CMAKE_CURRENT_BINARY_DIR}/psl_backup.stamp"
-    DEPENDS "${ORIGINAL_PSL_C}"
-    COMMENT "Backing up original curl/lib/psl.c"
-)
-add_custom_command(
-    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/patch_done.stamp"
-    COMMAND ${CMAKE_COMMAND} -P "${CMAKE_CURRENT_BINARY_DIR}/patch_psl.cmake"
-    COMMAND ${CMAKE_COMMAND} -E touch "${CMAKE_CURRENT_BINARY_DIR}/patch_done.stamp"
-    DEPENDS
-        "${CMAKE_CURRENT_BINARY_DIR}/patch_psl.cmake"
-        "${CMAKE_CURRENT_BINARY_DIR}/psl_backup.stamp"
-    COMMENT "Applying patch to curl/lib/psl.c"
-    VERBATIM
-)
-add_custom_target(patch_curl_psl ALL DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/patch_done.stamp")
-add_dependencies(libcurl_object patch_curl_psl)
-
 target_link_libraries(SuperBLT libcurl_static)
 
 
@@ -343,19 +299,3 @@ add_executable(SBLT_DLL_UPDATER updater/updater.cpp updater/compression.cpp upda
 target_link_libraries(SBLT_DLL_UPDATER crypt32.lib ws2_32.lib version.lib)
 target_link_libraries(SBLT_DLL_UPDATER psl zlib-ng libcurl_static)
 target_include_directories(SBLT_DLL_UPDATER PRIVATE updater)
-
-
-# ###############################################################################
-# ## post-cleanup curl psl.c workaround to prevent dirty submodule             ##
-# ###############################################################################
-add_custom_target(restore_and_clean_curl ALL
-    COMMAND ${CMAKE_COMMAND} -E echo "Restoring original curl/lib/psl.c from backup"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_CURRENT_BINARY_DIR}/psl.c.backup" "${ORIGINAL_PSL_C}"
-    COMMAND ${CMAKE_COMMAND} -E remove "${CMAKE_CURRENT_BINARY_DIR}/psl.c.backup"
-    COMMAND git -C "${CMAKE_CURRENT_SOURCE_DIR}/lib/sys/curl" reset --hard HEAD || ${CMAKE_COMMAND} -E true
-    COMMAND git -C "${CMAKE_CURRENT_SOURCE_DIR}/lib/sys/curl" clean -fdx || ${CMAKE_COMMAND} -E true
-    COMMENT "Restoring and cleaning curl submodule (removes patch)"
-    VERBATIM
-    DEPENDS SuperBLT IPHLPAPI WSOCK32 SBLT_DLL_UPDATER
-)
