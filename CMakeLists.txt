@@ -275,6 +275,25 @@ target_link_libraries(SuperBLT lua51)
 
 
 
+#### DieselEngineFormats ####
+
+add_library(DieselEngineFormats STATIC
+	lib/DieselFormats/dieselformats/src/diesel/modern/scriptdata.cpp
+	lib/DieselFormats/dieselformats/src/diesel/modern/hash.cpp
+    lib/DieselFormats/dieselformats/src/diesel/shared.cpp
+    lib/DieselFormats/dieselformats/src/diesel/animation.cpp
+    lib/DieselFormats/dieselformats/src/diesel/font.cpp
+
+	lib/DieselFormats/dieselformats/src/fileio/reader.cpp
+    lib/DieselFormats/dieselformats/src/fileio/writer.cpp
+    lib/DieselFormats/dieselformats/src/fileio/zlibcompression.cpp
+)
+target_include_directories(DieselEngineFormats PUBLIC lib/DieselFormats/dieselformats/src)
+target_link_libraries(DieselEngineFormats PRIVATE zlib-ng)
+target_link_libraries(SuperBLT DieselEngineFormats)
+
+
+
 ###############################################################################
 ## loader binary (this generates a seperate target for both Windows loaders) ##
 ###############################################################################
