@@ -2,61 +2,39 @@ name: Create SBLT Build
 
 on:
   push:
-    paths:
-      - src/**
+    branches: [ main ]
   pull_request:
-    paths:
-      - src/**
-  workflow_dispatch: 
-
-env:
-  BUILD_TYPE: RelWithDebInfo
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: windows-2022
+    runs-on: windows-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        submodules: true
-  
-    - name: Install Python3 and CMake
-      run: |
-        choco install -y python3
-        choco install -y cmake
-      shell: powershell
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set environment paths
-      run: |
-         $env:Path += ';C:\Program Files\CMake\bin'
-      shell: powershell
+      - name: Install Visual Studio 2022 Build Tools
+        uses: microsoft/setup-msbuild@v2
+        with:
+          vs-version: '[17.0,18.0)'
 
-    - name: Initialize and update Git submodules
-      run: |
-        git submodule init
-        git submodule update
-      shell: bash
+      - name: Install CMake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '3.28.x'
 
-    - name: Add msbuild to PATH
-      uses: microsoft/setup-msbuild@v3
+      - name: Configure CMake
+        run: |
+          cmake -B build -A x64 -G "Visual Studio 17 2022"
 
-      # Step 5: Build the project
-    - name: Build with CMake and MSBuild
-      run: |
-        mkdir build
-        cd build
-        cmake .. -A x64 -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=RelWithDebInfo
-        msbuild SuperBLT.sln /t:Build /p:Configuration=RelWithDebInfo
-      shell: powershell
+      - name: Build project
+        run: |
+          msbuild build\SuperBLT.sln /t:Build /p:Configuration=Release /m /v:m
 
-      # Step 6: Upload build artifacts
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: Build Artifacts
-        path: |
-          build/RelWithDebInfo/WSOCK32.dll
-          build/RelWithDebInfo/WSOCK32.pdb
-          build/RelWithDebInfo/SBLT_DLL_UPDATER.exe
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WSOCK32.dll
+          path: build\Release\WSOCK32.dll
