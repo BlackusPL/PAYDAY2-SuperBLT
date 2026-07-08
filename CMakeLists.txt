@@ -91,6 +91,7 @@ add_library(SuperBLT STATIC ${sources})
 target_compile_options(SuperBLT PRIVATE
 	-DCURL_STATICLIB
 	-DSUBHOOK_STATIC
+	-DWIN32_LEAN_AND_MEAN
 )
 
 # General optimisation breaks calls to certain lua functions, so replace it.
@@ -271,6 +272,25 @@ target_link_libraries(SuperBLT libcurl_static)
 
 add_subdirectory(src/luajit EXCLUDE_FROM_ALL)
 target_link_libraries(SuperBLT lua51)
+
+
+
+#### DieselEngineFormats ####
+
+add_library(DieselEngineFormats STATIC
+	lib/DieselFormats/dieselformats/src/diesel/modern/scriptdata.cpp
+	lib/DieselFormats/dieselformats/src/diesel/modern/hash.cpp
+    lib/DieselFormats/dieselformats/src/diesel/shared.cpp
+    lib/DieselFormats/dieselformats/src/diesel/animation.cpp
+    lib/DieselFormats/dieselformats/src/diesel/font.cpp
+
+	lib/DieselFormats/dieselformats/src/fileio/reader.cpp
+    lib/DieselFormats/dieselformats/src/fileio/writer.cpp
+    lib/DieselFormats/dieselformats/src/fileio/zlibcompression.cpp
+)
+target_include_directories(DieselEngineFormats PUBLIC lib/DieselFormats/dieselformats/src)
+target_link_libraries(DieselEngineFormats PRIVATE zlib-ng)
+target_link_libraries(SuperBLT DieselEngineFormats)
 
 
 

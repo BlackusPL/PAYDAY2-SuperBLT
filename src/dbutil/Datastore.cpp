@@ -107,7 +107,7 @@ size_t BLTStringDataStore::read(uint64_t position_in_file, uint8_t* data, size_t
 	if (remaining < length)
 		length = remaining;
 
-	memcpy(data, contents.c_str(), length);
+	memcpy(data, contents.c_str() + position_in_file, length);
 	return length;
 }
 
@@ -131,4 +131,109 @@ bool BLTStringDataStore::is_asynchronous() const
 bool BLTStringDataStore::good() const
 {
 	return true;
+}
+
+// BLTFormatConversionDataStore
+
+BLTFormatConversionDataStore::~BLTFormatConversionDataStore()
+{
+	DeleteUnderlyingDatastore();
+}
+
+BLTFormatConversionDataStore::BLTFormatConversionDataStore(ConversionFn&& fn, BLTAbstractDataStore* baseFile,
+                                                           int baseFileRefCountId)
+	: baseFile(baseFile), baseFileRefCountId(baseFileRefCountId), conversionFn(std::move(fn))
+{
+}
+
+size_t BLTFormatConversionDataStore::read(uint64_t position_in_file, uint8_t* data, size_t length)
+{
+	CheckConverted();
+
+	// Past EOF
+	if (position_in_file >= convertedData.size())
+		return 0;
+
+	// If the end of the read is past the end, shrink it down so it'll fit
+	size_t remaining = convertedData.size() - position_in_file;
+	if (remaining < length)
+		length = remaining;
+
+	memcpy(data, convertedData.data() + position_in_file, length);
+	return length;
+}
+
+bool BLTFormatConversionDataStore::close()
+{
+	RAIDHOOK_LOG_ERROR("BLTFormatConversionDataStore::good called - unimplemented!");
+	abort();
+}
+
+size_t BLTFormatConversionDataStore::size() const
+{
+	BLTFormatConversionDataStore* mutThis = (BLTFormatConversionDataStore*)this; // Ugly bodge
+	mutThis->CheckConverted();
+	return convertedData.size();
+}
+
+bool BLTFormatConversionDataStore::is_asynchronous() const
+{
+	return false;
+}
+
+bool BLTFormatConversionDataStore::good() const
+{
+	return true;
+}
+
+void BLTFormatConversionDataStore::CheckConverted()
+{
+	// Do we need a lockless happy path here? No, but I like writing lockless concurrent code :3
+
+	// Acquiring this happens-after the write setting it to true after the conversion
+	if (hasConverted.load(std::memory_order_acquire))
+		return;
+
+	std::lock_guard guard(lock);
+
+	// Check again under the mutex to avoid races
+	if (hasConverted.load(std::memory_order_acquire))
+		return;
+
+	// Load the base data
+	size_t rawSize = baseFile->size();
+	std::vector<uint8_t> rawData(rawSize);
+	baseFile->read(0, rawData.data(), rawSize);
+
+	// We don't need the old datastore any more
+	DeleteUnderlyingDatastore();
+
+	// Covert the data
+	convertedData = conversionFn(std::move(rawData));
+
+	// Release the flag, which happens-after the write to the data array
+	hasConverted.store(true, std::memory_order_release);
+}
+
+void BLTFormatConversionDataStore::DeleteUnderlyingDatastore()
+{
+	// Do the same thing as an Archive would
+	// Datastores use this big global reference count system. Objects have an ID, which you can then
+	// use to increment and decrement their reference count.
+	// If we're the last one to use this object - which we almost certainly are - then delete it.
+
+	if (!baseFile)
+		return;
+
+	int datastoreRefCount = DecreaseRefCountById(baseFileRefCountId);
+	if (datastoreRefCount != 0)
+		return;
+
+	using DtorFn = void (*)(void* thisPtr, bool freeMemory);
+	void* vtable = *(void***)baseFile;
+	DtorFn dtor = *(DtorFn*)vtable;
+	dtor(baseFile, true);
+
+	baseFile = nullptr;
+	baseFileRefCountId = -1; // If this ever runs again, we hopefully won't get a heisenbug.
 }
