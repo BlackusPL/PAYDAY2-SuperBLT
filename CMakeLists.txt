@@ -311,6 +311,9 @@ add_custom_command(
 )
 
 add_library(WSOCK32 SHARED loader/loader.cpp loader/loader.asm src/Resource.rc "${LOADER_GEN_ASM}" "${LOADER_GEN_DEF}")
+add_custom_command(TARGET WSOCK32 PRE_BUILD
+	COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/WSOCK32.dir/$<CONFIG>/loader"
+)
 target_link_libraries(WSOCK32 LINK_PRIVATE SuperBLT)
 target_include_directories(WSOCK32 PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/loader")
 
