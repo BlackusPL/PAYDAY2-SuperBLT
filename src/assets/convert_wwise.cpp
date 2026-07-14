@@ -12,7 +12,8 @@ bool CheckWwiseSoundbankRequiresConversion(BLTAbstractDataStore* datastore)
 	uint8_t version; // Actually an uint32_t, but the version will fit in a byte
 	datastore->read(8, &version, 1);
 
-	return (Wwise::BankVersion)version != Wwise::BankVersion::V2013;
+	// V2013 soundbanks are the old 32-bit ones
+	return (Wwise::BankVersion)version == Wwise::BankVersion::V2013;
 }
 
 std::vector<uint8_t> ConvertWwiseSoundbank(std::vector<uint8_t>&& data, const std::string& path)
