@@ -21,7 +21,7 @@ under the Apache License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
 OR CONDITIONS OF ANY KIND, either express or implied. See the Apache License for
 the specific language governing permissions and limitations under the License.
 
-  Copyright (c) 2026 Audiokinetic Inc.
+  Copyright (c) 2023 Audiokinetic Inc.
 *******************************************************************************/
 
 /**
@@ -32,7 +32,6 @@ the specific language governing permissions and limitations under the License.
 #pragma once
 
 #include "PluginHelpers.h"
-#include "PluginInstanceTypes.h"
 
 // Everthing in this section needs:
 // - to be converted back to plain vanilla C
@@ -71,12 +70,6 @@ namespace AK
 				LicenseStatus_Valid,		///< A license is found and is valid
 
 				LicenseStatus_Incompatible	///< The plugin was made for an older version of Wwise
-			};
-
-			struct LicenseID
-			{
-				// nul-terminated 8 characters license
-				char id[9];
 			};
 
 			/// Type of operation for the NotifyInnerObjectAddedRemoved function.
@@ -433,7 +426,7 @@ namespace AK
 				) = 0;
 			};
 
-			// Note: This should be kept in line with AkChunkHeader
+			// Note: This should be kept in line with RIFFHEADER
 			struct RiffHeader
 			{
 				uint32_t fccChunkId;
@@ -465,22 +458,20 @@ namespace AK
 
 				// Required downmix normalization gain (linear), 1 if not available / desired.
 				float downmixNormalizationGain;
-			};
 
-			struct ConvertedFileInfo
-			{
-				uint32_t dataSize = 0;			///< Actual size of data, taking duration into account (for prefetch)
-				uint32_t duration = -1;			///< Actual duration of data, or -1 for entire file
-				uint32_t sampleRate = 0;		///< Number of samples per second
+				//
+				// Outputs
+				//
+				uint32_t sampleRate;			///< Number of samples per second
 				AkChannelConfig channelConfig;	///< Channel configuration
-				uint32_t decodedFileSize = -1;	///< File size of file when decoded to PCM format, *If* offline decoding is supported by the codec. Otherwise has value NO_OFFLINE_DECODING (-1)
-				uint8_t abyHash[16] = { 0 };	///< Converted file hash (as present in the HASH chunk).
+				uint32_t decodedFileSize;		///< File size of file when decoded to PCM format, *If* offline decoding is supported by the codec.  Otherwise has value NO_OFFLINE_DECODING (-1)
 			};
 
 			struct OpenedConvertedFile
-				: public ConvertedFileInfo
 			{
-				const void* data = nullptr;		///< Pointer to start of file data
+				const void* data;
+				uint32_t dataSize;
+				uint32_t duration;				///< Actual duration of data, or -1 for entire file.
 			};
 		}
 	}
@@ -490,6 +481,435 @@ namespace AK
 /** \addtogroup global
  * @{
  */
+
+struct ak_wwise_plugin_base_interface;
+typedef struct ak_wwise_plugin_base_interface* ak_wwise_plugin_interface_ptr;											///< Pointer to a generic base from a plug-in interface.
+
+/**
+ * \brief Generic base for all plug-in instances. In C++, this is derived. In C, they are equivalent.
+ * 
+ * \sa
+ * - \ref ak_wwise_plugin_cpp_base_instance for disrepancies between the C and C++ model.
+ */
+struct ak_wwise_plugin_base_instance {};
+typedef struct ak_wwise_plugin_base_instance* ak_wwise_plugin_instance_ptr;												///< Pointer to a generic base for a plug-in instances.
+
+struct ak_wwise_plugin_interface_array_item;
+struct ak_wwise_plugin_info;
+struct ak_wwise_plugin_container;
+
+typedef void ak_wwise_plugin_widget;
+
+#ifdef __cplusplus
+/**
+ * \brief Generic base for all plug-in instances in C++
+ * 
+ * \warning This differs from the ak_wwise_plugin_base_instance, as C++ classes have a virtual table as their first member.
+ * It's important to make the distinction between the two by specifically doing a static_cast between the C version and the C++ version,
+ * and not a mere reinterpret_cast or a C-style cast. As such, it is expected to instantiate a plug-in in C++, and return
+ * C pointers back to the instance structures with a different base address.
+ */
+struct ak_wwise_plugin_cpp_base_instance : public ak_wwise_plugin_base_instance
+{
+	virtual ~ak_wwise_plugin_cpp_base_instance() {}
+};
+
+/**
+ * \brief Define a generic instance base, either in C or in C++.
+ * 
+ * \warning These are NOT equivalent! In C, it is expected you can directly cast from your instance to an
+ * ak_wwise_plugin_base_instance. In C++, since the base classes have a virtual table, the pointer to the C members is
+ * shifted in memory.
+ */
+#define AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE : public ak_wwise_plugin_cpp_base_instance
+#else
+#define AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE
+#endif
+
+/**
+ * \brief Plug-in backend instance.
+ * 
+ * A backend contains all the logic for the Authoring part of the plug-in. It is uniquely instantiated for each plug-in instance
+ * in a project.
+ */
+struct ak_wwise_plugin_backend_instance AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE {};
+
+/**
+ * \brief Plug-in frontend instance.
+ * 
+ * A frontend contains the visual part of the Authoring plug-in. It is optional, for example, it is never instantiated when
+ * connecting through WwiseConsole. As such, there should never be any processing or "intelligence" done in a frontend part.
+ * 
+ * For example, the frontend should not affect licensing, soundbank generation, audio processing, property handling (such as
+ * validating ranges for property sets), media handling, media conversion, custom data loading, ...
+ * 
+ * \aknote Porting note: In legacy plug-ins, there is only one instance of the Authoring plug-in that contains both
+ * the backend and the frontend. This has changed for multiple reasons: to be able to instantiate a plug-in backend without any
+ * frontend, or alternatively, to instantiate multiple copies of a frontend for a unique backend. \endaknote
+ */
+struct ak_wwise_plugin_frontend_instance AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE {};
+
+#ifdef __cplusplus
+/**
+ * \brief Define an instance type as a backend.
+ * 
+ * In C++, this derives the backend instance from the ak_wwise_plugin_backend_instance in a separate action so that RTTI can help
+ * pinpoint the types and the compiler ensures the type correctness.
+ * 
+ * In C, this is a typedef, as we cannot derive. The compiler also doesn't need to lookup addresses for complex structures, so this
+ * is merely an equivalency.
+ * 
+ * \sa
+ * - \ref ak_wwise_plugin_backend_instance for a backend discussion.
+ * - \ref ak_wwise_plugin_frontend_instance for a frontend discussion.
+ * - \ref ak_wwise_plugin_cpp_base_instance for disrepancies between the C and C++ model.
+ */
+#define AK_WWISE_PLUGIN_DERIVE_FROM_BACKEND_INSTANCE(x) \
+	struct x : public ak_wwise_plugin_backend_instance {}
+
+/**
+ * \brief Define an instance type as a frontend.
+ * 
+ * In C++, this derives the frontend instance from the ak_wwise_plugin_frontend_instance in a separate action so that RTTI can help
+ * pinpoint the types and the compiler ensures the type correctness.
+ * 
+ * In C, this is a typedef, as we cannot derive. The compiler also doesn't need to lookup addresses for complex structures, so this
+ * is merely an equivalency.
+ * 
+ * \sa
+ * - \ref ak_wwise_plugin_backend_instance for a backend discussion.
+ * - \ref ak_wwise_plugin_frontend_instance for a frontend discussion.
+ * - \ref ak_wwise_plugin_cpp_base_instance for disrepancies between the C and C++ model.
+ */
+#define AK_WWISE_PLUGIN_DERIVE_FROM_FRONTEND_INSTANCE(x) \
+	struct x : public ak_wwise_plugin_frontend_instance {}
+#else
+#define AK_WWISE_PLUGIN_DERIVE_FROM_BACKEND_INSTANCE(x) \
+	typedef x ak_wwise_plugin_backend_instance
+#define AK_WWISE_PLUGIN_DERIVE_FROM_FRONTEND_INSTANCE(x) \
+	typedef x ak_wwise_plugin_frontend_instance
+#endif
+
+/**
+ * \brief Base host-provided instance type for ak_wwise_plugin_host_v1.
+ * 
+ * \sa
+ * - ak_wwise_plugin_host_v1 C interface.
+ * - AK::Wwise::Plugin::V1::Host C++ class.
+ */
+struct ak_wwise_plugin_host_instance_v1 AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE {};
+
+/**
+ * \brief Base host-provided instance type for ak_wwise_plugin_host_conversion_helpers_v1.
+ * 
+ * \sa
+ * - ak_wwise_plugin_host_conversion_helpers_v1 C interface.
+ * - AK::Wwise::Plugin::V1::ConversionHelpers C++ class.
+ */
+struct ak_wwise_plugin_host_conversion_helpers_instance_v1 AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE {};
+
+/**
+ * \brief Base host-provided instance type for ak_wwise_plugin_host_data_writer_v1.
+ * 
+ * \sa
+ * - ak_wwise_plugin_host_data_writer_v1 C interface.
+ * - AK::Wwise::Plugin::V1::DataWriter C++ class.
+ */
+struct ak_wwise_plugin_host_data_writer_instance_v1 AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE {};
+
+/**
+ * \brief Base host-provided instance type for ak_wwise_plugin_host_object_media_v1.
+ * 
+ * \sa
+ * - ak_wwise_plugin_host_object_media_v1 C interface.
+ * - AK::Wwise::Plugin::V1::ObjectMedia C++ class.
+ */
+struct ak_wwise_plugin_host_object_media_instance_v1 AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE {};
+
+/**
+ * \brief Base host-provided instance type for ak_wwise_plugin_host_object_store_v1.
+ * 
+ * \sa
+ * - ak_wwise_plugin_host_object_store_v1 C interface.
+ * - AK::Wwise::Plugin::V1::ObjectStore C++ class.
+ */
+struct ak_wwise_plugin_host_object_store_instance_v1 AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE {};
+
+/**
+ * \brief Base host-provided instance type for ak_wwise_plugin_host_property_set_v1.
+ * 
+ * \sa
+ * - ak_wwise_plugin_host_property_set_v1 C interface.
+ * - AK::Wwise::Plugin::V1::PropertySet C++ class.
+ */
+struct ak_wwise_plugin_host_property_set_instance_v1 AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE {};
+
+/**
+ * \brief Base host-provided instance type for ak_wwise_plugin_host_undo_manager_v1.
+ * 
+ * \sa
+ * - ak_wwise_plugin_host_undo_manager_v1 C interface.
+ * - AK::Wwise::Plugin::V1::UndoManager C++ class.
+ */
+struct ak_wwise_plugin_host_undo_manager_instance_v1 AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE {};
+
+/**
+ * \brief Base host-provided instance type for reading XML files through ak_wwise_plugin_host_xml_v1.
+ * 
+ * \sa
+ * - ak_wwise_plugin_host_xml_v1 C interface.
+ * - AK::Wwise::Plugin::V1::XmlReader C++ class.
+ */
+struct ak_wwise_plugin_host_xml_reader_instance_v1 AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE {};
+
+/**
+ * \brief Base host-provided instance type for writing XML files through ak_wwise_plugin_host_xml_v1.
+ * 
+ * \sa
+ * - ak_wwise_plugin_host_xml_v1 C interface.
+ * - AK::Wwise::Plugin::V1::XmlWriter C++ class.
+ */
+struct ak_wwise_plugin_host_xml_writer_instance_v1 AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE {};
+
+
+struct ak_wwise_plugin_analysis_task_v1;
+/**
+ * \brief Base instance type for providing analysis task services through ak_wwise_plugin_analysis_task_v1.
+ * 
+ * \sa
+ * - ak_wwise_plugin_analysis_task_v1 C interface.
+ * - AK::Wwise::Plugin::V1::AnalysisTask C++ class.
+ */
+struct ak_wwise_plugin_analysis_task_instance_v1 AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE {};
+
+struct ak_wwise_plugin_audio_plugin_v1;
+/**
+ * \brief Base instance type for providing audio plug-in backend services through ak_wwise_plugin_audio_plugin_v1.
+ * 
+ * \sa
+ * - ak_wwise_plugin_audio_plugin_v1 C interface.
+ * - AK::Wwise::Plugin::V1::AudioPlugin C++ class.
+ */
+AK_WWISE_PLUGIN_DERIVE_FROM_BACKEND_INSTANCE(ak_wwise_plugin_audio_plugin_instance_v1);
+
+struct ak_wwise_plugin_conversion_v1;
+/**
+ * \brief Base instance type for providing a conversion plug-in through ak_wwise_plugin_conversion_v1.
+ * 
+ * \sa
+ * - ak_wwise_plugin_conversion_v1 C interface.
+ * - AK::Wwise::Plugin::V1::Conversion C++ class.
+ */
+AK_WWISE_PLUGIN_DERIVE_FROM_BACKEND_INSTANCE(ak_wwise_plugin_conversion_instance_v1);
+
+struct ak_wwise_plugin_custom_data_v1;
+/**
+ * \brief Base instance type for providing custom data loading and saving through ak_wwise_plugin_custom_data_v1.
+ * 
+ * \sa
+ * - ak_wwise_plugin_custom_data_v1 C interface.
+ * - AK::Wwise::Plugin::V1::CustomData C++ class.
+ */
+struct ak_wwise_plugin_custom_data_instance_v1 AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE {};
+
+struct ak_wwise_plugin_property_display_name_v1;
+/**
+ * \brief Base instance type for providing display names to properties through ak_wwise_plugin_property_display_name_v1.
+ * 
+ * \sa
+ * - ak_wwise_plugin_property_display_name_v1 C interface.
+ * - AK::Wwise::Plugin::V1::PropertyDisplayName C++ class.
+ */
+struct ak_wwise_plugin_property_display_name_instance_v1 AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE {};
+
+struct ak_wwise_plugin_feedback_aware_v1;
+/**
+ * \brief Base instance type for providing property-based feedback through ak_wwise_plugin_feedback_aware_v1.
+ * 
+ * \sa
+ * - ak_wwise_plugin_feedback_aware_v1 C interface.
+ * - AK::Wwise::Plugin::V1::FeedbackAware C++ class.
+ */
+struct ak_wwise_plugin_feedback_aware_instance_v1 AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE {};
+
+struct ak_wwise_plugin_gui_conversion_windows_v1;
+/**
+ * \brief Base instance type for providing a Windows frontend for a conversion plug-in through ak_wwise_plugin_gui_conversion_windows_v1.
+ * 
+ * \sa
+ * - ak_wwise_plugin_gui_conversion_windows_v1 C interface.
+ * - AK::Wwise::Plugin::V1::GUIConversionWindows C++ class.
+ * - ak_wwise_plugin_conversion_v1 Conversion backend's C interface.
+ * - AK::Wwise::Plugin::V1::Conversion Conversion frontend's C++ class.
+ */
+AK_WWISE_PLUGIN_DERIVE_FROM_FRONTEND_INSTANCE(ak_wwise_plugin_gui_conversion_windows_instance_v1);
+
+struct ak_wwise_plugin_gui_windows_v1;
+/**
+ * \brief Base instance type for providing a Windows frontend for an audio plug-in through ak_wwise_plugin_gui_windows_v1.
+ * 
+ * \sa
+ * - ak_wwise_plugin_gui_windows_v1 C interface.
+ * - AK::Wwise::Plugin::V1::GUIWindows C++ class.
+ * - ak_wwise_plugin_audio_plugin_v1 Audio plug-in backend's C interface.
+ * - AK::Wwise::Plugin::V1::AudioPlugin Audio plug-in frontend's C++ class.
+ */
+AK_WWISE_PLUGIN_DERIVE_FROM_FRONTEND_INSTANCE(ak_wwise_plugin_gui_windows_instance_v1);
+
+struct ak_wwise_plugin_link_backend_v1;
+/**
+ * \brief Base host-provided instance to retrieve the related backend instance, as shown in the frontend.
+ * 
+ * \sa
+ * - ak_wwise_plugin_link_backend_v1 C interface.
+ * - AK::Wwise::Plugin::V1::LinkBackend C++ class.
+ */
+struct ak_wwise_plugin_link_backend_instance_v1 AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE {};
+
+struct ak_wwise_plugin_link_frontend_v1;
+/**
+ * \brief Base host-provided instance to retrieve the related frontend instances related to the current backend.
+ * 
+ * \sa
+ * - ak_wwise_plugin_link_frontend_v1 C interface.
+ * - AK::Wwise::Plugin::V1::LinkFrontend C++ class.
+ */
+struct ak_wwise_plugin_link_frontend_instance_v1 AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE {};
+
+struct ak_wwise_plugin_media_converter_v1;
+/**
+ * \brief Base instance type for providing custom media conversion through ak_wwise_plugin_media_converter_v1.
+ * 
+ * \sa
+ * - ak_wwise_plugin_media_converter_v1 C interface.
+ * - AK::Wwise::Plugin::V1::MediaConverter C++ class.
+ */
+struct ak_wwise_plugin_media_converter_instance_v1 AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE {};
+
+struct ak_wwise_plugin_notifications_host_v1;
+/**
+ * \brief Base instance type for receiving notifications on host changes events.
+ * 
+ * \sa
+ * - ak_wwise_plugin_notifications_host_v1 C interface.
+ * - AK::Wwise::Plugin::V1::Notifications::Host_ C++ class.
+ * - ak_wwise_plugin_host_v1 Related C host interface.
+ * - AK::Wwise::Plugin::V1::Host Related C++ host class.
+ */
+struct ak_wwise_plugin_notifications_host_instance_v1 AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE {};
+
+struct ak_wwise_plugin_notifications_monitor_v1;
+/**
+ * \brief Base instance type for receiving Sound Engine's monitoring data.
+ * 
+ * \sa
+ * - ak_wwise_plugin_notifications_monitor_v1 C interface.
+ * - AK::Wwise::Plugin::V1::Notifications::Monitor C++ class.
+ * - AK::Wwise::Plugin::MonitorData
+ */
+struct ak_wwise_plugin_notifications_monitor_instance_v1 AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE {};
+
+struct ak_wwise_plugin_notifications_object_media_v1;
+/**
+ * \brief Base instance type for receiving notifications on related object media's changes.
+ * 
+ * \sa
+ * - ak_wwise_plugin_notifications_object_media_v1 C interface.
+ * - AK::Wwise::Plugin::V1::Notifications::ObjectMedia_ C++ class.
+ * - ak_wwise_plugin_host_object_media_v1 Related C host interface.
+ * - AK::Wwise::Plugin::V1::ObjectMedia Related C++ host class.
+ */
+struct ak_wwise_plugin_notifications_object_media_instance_v1 AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE {};
+
+struct ak_wwise_plugin_notifications_object_store_v1;
+/**
+ * \brief Base instance type for receiving notifications on related Object Store's changes.
+ * 
+ * \sa
+ * - ak_wwise_plugin_notifications_object_store_v1 C interface.
+ * - AK::Wwise::Plugin::V1::Notifications::ObjectStore_ C++ class.
+ * - ak_wwise_plugin_host_object_store_v1 Related C host interface.
+ * - AK::Wwise::Plugin::V1::ObjectStore Related C++ host class.
+ */
+struct ak_wwise_plugin_notifications_object_store_instance_v1 AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE {};
+
+struct ak_wwise_plugin_notifications_property_set_v1;
+/**
+ * \brief Base instance type for receiving notifications on property set's changes.
+ * 
+ * \sa
+ * - ak_wwise_plugin_notifications_property_set_v1 C interface.
+ * - AK::Wwise::Plugin::V1::Notifications::PropertySet_ C++ class.
+ * - ak_wwise_plugin_host_property_set_v1 Related C host interface.
+ * - AK::Wwise::Plugin::V1::PropertySet Related C++ host class.
+ */
+struct ak_wwise_plugin_notifications_property_set_instance_v1 AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE {};
+
+struct ak_wwise_plugin_source_v1;
+/**
+ * \brief Base instance type for providing source-specific information, through ak_wwise_plugin_source_v1.
+ * 
+ * \sa
+ * - ak_wwise_plugin_source_v1 C interface.
+ * - AK::Wwise::Plugin::V1::Source C++ class.
+ */
+struct ak_wwise_plugin_source_instance_v1 AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE {};
+
+struct ak_wwise_plugin_undo_event_v1;
+/**
+ * \brief Base instance type for providing custom undo operations through ak_wwise_plugin_undo_event_v1.
+ * 
+ * \sa
+ * - ak_wwise_plugin_undo_event_v1 C interface.
+ * - AK::Wwise::Plugin::V1::UndoEvent C++ class.
+ * - ak_wwise_plugin_host_undo_manager_v1 Host's C manager interface.
+ * - AK::Wwise::Plugin::V1::UndoManager Host's C++ manager class.
+ */
+struct ak_wwise_plugin_undo_event_instance_v1 AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE {};
+
+struct ak_wwise_plugin_license_v1;
+/**
+ * \brief Base instance type for providing licensing information, through ak_wwise_plugin_license_v1.
+ * 
+ * \sa
+ * - ak_wwise_plugin_license_v1 C interface.
+ * - AK::Wwise::Plugin::V1::License C++ class.
+ */
+struct ak_wwise_plugin_license_instance_v1 AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE {};
+
+
+/**
+ * \brief Base instance type for providing a message shown the first time an instance is created through ak_wwise_plugin_first_time_creation_message_v1.
+ * 
+ * \sa
+ * - ak_wwise_plugin_first_time_creation_message_v1 C interface.
+ * - AK::Wwise::Plugin::V1::FirstTimeCreationMessage C++ class.
+ */
+struct ak_wwise_plugin_first_time_creation_message_instance_v1 AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE {};
+
+/**
+ * \brief Base instance type for providing a device list for your custom sink through ak_wwise_plugin_sink_devices_v1.
+ * 
+ * \sa
+ * - ak_wwise_plugin_sink_devices_v1 C interface.
+ * - AK::Wwise::Plugin::V1::SinkDevices C++ class.
+ */
+struct ak_wwise_plugin_sink_devices_instance_v1 AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE {};
+
+struct ak_wwise_plugin_test_service_instance_v1 AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE {};
+struct ak_wwise_plugin_test_service_instance_v2 AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE {};
+
+struct ak_wwise_plugin_frontend_v1;
+AK_WWISE_PLUGIN_DERIVE_FROM_FRONTEND_INSTANCE(ak_wwise_plugin_frontend_instance_v1);
+
+struct ak_wwise_plugin_host_frontend_model_instance_v1 AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE {};
+
+struct ak_wwise_plugin_host_frontend_model_args_v1 AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE
+{
+	const char* templateName;
+};
+
+#undef AK_WWISE_PLUGIN_DERIVE_FROM_INSTANCE_BASE
 
 /**
  * \brief A definition of an undo event, with a specific interface and instance.
@@ -543,45 +963,24 @@ typedef enum {
 } ak_wwise_plugin_undo_group_close_action;
 
 /**
- * \brief Bitfield values of brace types, used to delay or avoid certain actions normally triggered as a result
- * of a property set mutation.
- *
- * - \ref AK_WWISE_PLUGIN_PROPERTY_SET_BRACES_NO_NOTIFY : Do not notify of changes
- * - \ref AK_WWISE_PLUGIN_PROPERTY_SET_BRACES_NO_UNDO_EVENTS : Do not create undo events
- * - \ref AK_WWISE_PLUGIN_PROPERTY_SET_BRACES_SET_VALUE : Collapse set values notifications once the brace is closed
- * - \ref AK_WWISE_PLUGIN_PROPERTY_SET_BRACES_REORDER_CHILDREN : Children are being reordered
- * - \ref AK_WWISE_PLUGIN_PROPERTY_SET_BRACES_DISABLE_PROPERTY_CONSTRAINTS : Disable property constraints
- * - \ref AK_WWISE_PLUGIN_PROPERTY_SET_BRACES_NO_DIRTY : Inhibit the project's dirty state
- * - \ref AK_WWISE_PLUGIN_PROPERTY_SET_BRACES_CREATE_PROPERTY_ON_SET_VALUE : Create a new property when an unknown property is set
- * - \ref AK_WWISE_PLUGIN_PROPERTY_SET_BRACES_CHANGE_TO_EXISTING_VALUE_TYPE : Allow a property type change if the provided type differs from its current type
- * - \ref AK_WWISE_PLUGIN_PROPERTY_SET_BRACES_LOADING : Indicates the object is being loaded
- * - \ref AK_WWISE_PLUGIN_PROPERTY_SET_BRACES_UNLOADING : Indicates the object is being unloaded
- * - \ref AK_WWISE_PLUGIN_PROPERTY_SET_BRACES_DELETING : Indicates the object is being deleted
- * - \ref AK_WWISE_PLUGIN_PROPERTY_SET_BRACES_SET_OBJECT_LIST : Collapse the final set object list once the last brace is closed
- *
- * \sa
- * - AK::Wwise::Plugin::PropertySet::OpenBraces
- * - AK::Wwise::Plugin::PropertySet::CloseBraces
-*/
-typedef enum
-{
-	AK_WWISE_PLUGIN_PROPERTY_SET_BRACES_NO_NOTIFY                     = 1 << 0,
-	AK_WWISE_PLUGIN_PROPERTY_SET_BRACES_NO_UNDO_EVENTS                = 1 << 1,
-	AK_WWISE_PLUGIN_PROPERTY_SET_BRACES_SET_VALUE                     = 1 << 2,
-	AK_WWISE_PLUGIN_PROPERTY_SET_BRACES_REORDER_CHILDREN              = 1 << 3,
-	AK_WWISE_PLUGIN_PROPERTY_SET_BRACES_DISABLE_PROPERTY_CONSTRAINTS  = 1 << 4,
-	AK_WWISE_PLUGIN_PROPERTY_SET_BRACES_NO_DIRTY                      = 1 << 5,
-	AK_WWISE_PLUGIN_PROPERTY_SET_BRACES_CREATE_PROPERTY_ON_SET_VALUE  = 1 << 6,
-	AK_WWISE_PLUGIN_PROPERTY_SET_BRACES_CHANGE_TO_EXISTING_VALUE_TYPE = 1 << 7,
-	AK_WWISE_PLUGIN_PROPERTY_SET_BRACES_LOADING                       = 1 << 8,
-	AK_WWISE_PLUGIN_PROPERTY_SET_BRACES_UNLOADING                     = 1 << 9,
-	AK_WWISE_PLUGIN_PROPERTY_SET_BRACES_DELETING                      = 1 << 10,
-	AK_WWISE_PLUGIN_PROPERTY_SET_BRACES_SET_OBJECT_LIST               = 1 << 11,
-} ak_wwise_plugin_property_set_braces_values;
-
-/// \brief Bitfield composed of values defined in \c ak_wwise_plugin_property_set_braces_values
-typedef uint32_t ak_wwise_plugin_property_set_braces;
-
-/**
  * @}
  */
+
+#ifdef __cplusplus
+namespace AK::Wwise::Plugin
+{
+	using CBaseInterface = ak_wwise_plugin_base_interface;																///< \copydoc ak_wwise_plugin_base_interface
+	using CInterfacePtr = ak_wwise_plugin_interface_ptr;
+	using CInterfaceArrayItem = ak_wwise_plugin_interface_array_item;													///< \copydoc ak_wwise_plugin_interface_array_item
+	using CPluginInfo = ak_wwise_plugin_info;																			///< \copydoc ak_wwise_plugin_info
+	using CPluginContainer = ak_wwise_plugin_container;																	///< \copydoc ak_wwise_plugin_container
+	using CWidget = ak_wwise_plugin_widget;
+
+	using BaseInterface = CBaseInterface;																				///< \copydoc ak_wwise_plugin_base_interface
+	using InterfacePtr = CInterfacePtr;
+	using InterfaceArrayItem = CInterfaceArrayItem;																		///< \copydoc ak_wwise_plugin_interface_array_item
+	using PluginInfo = CPluginInfo;																						///< \copydoc ak_wwise_plugin_info
+	using PluginContainer = CPluginContainer;																			///< \copydoc ak_wwise_plugin_container
+	using Widget = CWidget;
+}
+#endif

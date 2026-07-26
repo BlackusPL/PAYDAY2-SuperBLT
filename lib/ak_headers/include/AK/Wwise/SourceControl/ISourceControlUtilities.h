@@ -21,7 +21,7 @@ under the Apache License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
 OR CONDITIONS OF ANY KIND, either express or implied. See the Apache License for
 the specific language governing permissions and limitations under the License.
 
-  Copyright (c) 2026 Audiokinetic Inc.
+  Copyright (c) 2023 Audiokinetic Inc.
 *******************************************************************************/
 
 /// \file
@@ -34,7 +34,7 @@ the specific language governing permissions and limitations under the License.
 #include <AK/SoundEngine/Common/AkTypes.h>
 
 #include "ISourceControlDialogBase.h"
-#include "ISourceControlProgress.h"
+#include "ISourceControlOperationProgress.h"
 
 // Audiokinetic namespace
 namespace AK
@@ -48,10 +48,10 @@ namespace AK
 		class ISourceControlUtilities
 		{
 		public:
-			/// Get a pointer to an AK::Wwise::ISourceControlProgress interface, so you can display a simple progress dialog for the operation.
+			/// Get a pointer to an AK::Wwise::ISourceControlOperationProgress interface, so you can display a simple progress dialog for the operation.
 			/// \warning This function is not thread-safe.
 			/// \return A pointer to an AK::Wwise::ISourceControlOperationProgress interface.
-			virtual ISourceControlProgress* GetProgress() = 0;
+			virtual ISourceControlOperationProgress* GetProgressDialog() = 0;
 
 			/// This function does the same thing as the standard \c MessageBox function, except that this one will
 			/// be displayed with the Wwise UI look and feel.
@@ -152,10 +152,6 @@ namespace AK
 			/// Retrieve if the current operation was marked as to be cancelled.
 			/// \return True if the user requested to cancel the current operation.
 			virtual bool IsCancelRequested() const = 0;
-
-			/// Log a message into the Source Control channel
-			/// \note This message will be visible to users in the Log view
-			virtual void LogMessage(LPCWSTR in_pszMessage) = 0;
 		};
 	}
 }

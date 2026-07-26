@@ -21,7 +21,7 @@ under the Apache License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
 OR CONDITIONS OF ANY KIND, either express or implied. See the Apache License for
 the specific language governing permissions and limitations under the License.
 
-  Copyright (c) 2026 Audiokinetic Inc.
+  Copyright (c) 2023 Audiokinetic Inc.
 *******************************************************************************/
 
 // AkQueryParameters.h
@@ -126,7 +126,7 @@ namespace AK
 			/// \sa 
 			/// - \ref soundengine_listeners_settingpos
 			AK_EXTERNAPIFUNC( AKRESULT, GetListenerPosition )( 
-				AkGameObjectID in_uListenerID, 					///< Listener game object ID. 
+				AkGameObjectID in_uIndex, 						///< Listener index (0: first listener, 7: 8th listener)
 				AkListenerPosition& out_rPosition			///< Position set
 				);
 
@@ -136,7 +136,7 @@ namespace AK
 			/// - AK::SoundEngine::SetListenerSpatialization().
 			/// - \ref soundengine_listeners_spatial
 			AK_EXTERNAPIFUNC( AKRESULT, GetListenerSpatialization )(
-				AkGameObjectID in_uListenerID,				///< Listener game object ID. 
+				AkUInt32 in_uIndex,							///< Listener index (0: first listener, 7: 8th listener)
 				bool& out_rbSpatialized,					///< Spatialization enabled
 				AK::SpeakerVolumes::VectorPtr & out_pVolumeOffsets,	///< Per-speaker vector of volume offsets, in decibels. Use the functions of AK::SpeakerVolumes::Vector to interpret it.
 				AkChannelConfig &out_channelConfig			///< Channel configuration associated with out_rpVolumeOffsets. 
@@ -163,25 +163,19 @@ namespace AK
 				RTPCValue_Global,		///< The value is the Global RTPC.
 				RTPCValue_GameObject,	///< The value is the game object specific RTPC.
 				RTPCValue_PlayingID,	///< The value is the playing ID specific RTPC.
-				RTPCValue_Unavailable,	///< The value is not available for the RTPC specified.
-				RTPCValue_Last,			///< End of enum, invalid value.
+				RTPCValue_Unavailable	///< The value is not available for the RTPC specified.
 			};
 
 			/// Get the value of a real-time parameter control (by ID)
-			/// An RTPC can have a any combination of a global value, a unique value for each game object, or a unique value for each playing ID (Event).
+			/// An RTPC can have a any combination of a global value, a unique value for each game object, or a unique value for each playing ID.  
 			/// The value requested is determined by RTPCValue_type, in_gameObjectID and in_playingID.  
 			/// If a value at the requested scope (determined by RTPCValue_type) is not found, the value that is available at the the next broadest scope will be returned, and io_rValueType will be changed to indicate this.
 			/// \note
 			///		When looking up RTPC values via playing ID (ie. io_rValueType is RTPC_PlayingID), in_gameObjectID can be set to a specific game object (if it is available to the caller) to use as a fall back value.
 			///		If the game object is unknown or unavailable, AK_INVALID_GAME_OBJECT can be passed in in_gameObjectID, and the game object will be looked up via in_playingID.  
 			///		However in this case, it is not possible to retrieve a game object value as a fall back value if the playing id does not exist.  It is best to pass in the game object if possible.
-			/// \note
-			///		Contrary to most AK::Query functions, GetRTPCValue does not block. This means that GetRTPCValue does not wait for all previous API to be completed (which may take several milliseconds), 
-			///		and instead returns the current value. Therefore calling SetRTPCValue, RenderAudio and then GetRTPCValue might not immediately give the value set by SetRTPCValue.
-			/// \return
-			///	- AK_Success if succeeded
-			/// - AK_IDNotFound if the RTPC does not exist
-			/// - AK_InvalidID if the GameObject does not exist.
+			///		
+			/// \return AK_Success if succeeded, AK_IDNotFound if the RTPC does not exist
 			/// \sa 
 			/// - \ref soundengine_rtpc
 			/// - RTPCValue_type
@@ -203,13 +197,8 @@ namespace AK
 			///		When looking up RTPC values via playing ID (ie. io_rValueType is RTPC_PlayingID), in_gameObjectID can be set to a specific game object (if it is available to the caller) to use as a fall back value.
 			///		If the game object is unknown or unavailable, AK_INVALID_GAME_OBJECT can be passed in in_gameObjectID, and the game object will be looked up via in_playingID.  
 			///		However in this case, it is not possible to retrieve a game object value as a fall back value if the playing id does not exist.  It is best to pass in the game object if possible.
-			/// \note
-			///		Contrary to most AK::Query functions, GetRTPCValue does not block. This means that GetRTPCValue does not wait for all previous API to be completed (which may take several milliseconds), 
-			///		and instead returns the current value. Therefore calling SetRTPCValue, RenderAudio and then GetRTPCValue might not immediately give the value set by SetRTPCValue.
-			/// \return
-			///	- AK_Success if succeeded
-			/// - AK_IDNotFound if the RTPC does not exist
-			/// - AK_InvalidID if the GameObject does not exist.
+			///		
+			/// \return AK_Success if succeeded, AK_IDNotFound if the RTPC does not exist
 			/// \sa 
 			/// - \ref soundengine_rtpc
 			/// - RTPCValue_type
@@ -231,13 +220,8 @@ namespace AK
 			///		When looking up RTPC values via playing ID (ie. io_rValueType is RTPC_PlayingID), in_gameObjectID can be set to a specific game object (if it is available to the caller) to use as a fall back value.
 			///		If the game object is unknown or unavailable, AK_INVALID_GAME_OBJECT can be passed in in_gameObjectID, and the game object will be looked up via in_playingID.  
 			///		However in this case, it is not possible to retrieve a game object value as a fall back value if the playing id does not exist.  It is best to pass in the game object if possible.
-			/// \note
-			///		Contrary to most AK::Query functions, GetRTPCValue does not block. This means that GetRTPCValue does not wait for all previous API to be completed (which may take several milliseconds), 
-			///		and instead returns the current value. Therefore calling SetRTPCValue, RenderAudio and then GetRTPCValue might not immediately give the value set by SetRTPCValue.
-			/// \return
-			///	- AK_Success if succeeded
-			/// - AK_IDNotFound if the RTPC does not exist
-			/// - AK_InvalidID if the GameObject does not exist.
+			///		
+			/// \return AK_Success if succeeded, AK_IDNotFound if the RTPC does not exist
 			/// \sa 
 			/// - \ref soundengine_rtpc
 			/// - RTPCValue_type
@@ -249,78 +233,65 @@ namespace AK
 				RTPCValue_type&	io_rValueType		///< In/Out value, the user must specify the requested type. The function will return in this variable the type of the returned value.				);
 				);
 
-			/// Get the current Switch value of the specified Switch Group, for a game object 
-			/// \note
-			///		Contrary to most AK::Query functions, GetSwitch does not block. This means that GetSwitch does not wait for all previous API to be completed (which may take several milliseconds), 
-			///		and instead returns the current value. Therefore calling SetSwitch, RenderAudio and then GetSwitch might not immediately give the value set by SetSwitch.
-			/// \return
-			///	- AK_Success if succeeded
-			/// - AK_IDNotFound if the RTPC does not exist
-			/// - AK_InvalidID if the GameObject does not exist.
-			/// \return AK_Success if succeeded, or AK_IDNotFound if the game object was not registered or the Switch Group name cannot be found
+			/// Get the state of a switch group (by IDs).
+			/// \return AK_Success if succeeded, or AK_IDNotFound if the game object was not registered
 			/// \sa 
 			/// - \ref soundengine_switch
-			/// - \ref AK::SoundEngine::SetSwitch
 			AK_EXTERNAPIFUNC( AKRESULT, GetSwitch )( 
-				AkSwitchGroupID in_switchGroup, 			///< ID of the Switch Group
+				AkSwitchGroupID in_switchGroup, 			///< ID of the switch group
 				AkGameObjectID  in_gameObjectID,			///< Associated game object ID
-				AkSwitchStateID& out_rSwitchState 			///< ID of the Switch
+				AkSwitchStateID& out_rSwitchState 			///< ID of the switch
 				);
 
 #ifdef AK_SUPPORT_WCHAR
-			/// Get the current Switch value of the specified Switch Group, for a game object 
-			/// \return AK_Success if succeeded, or AK_IDNotFound if the game object was not registered or the Switch Group name cannot be found
+			/// Get the state of a switch group.
+			/// \return AK_Success if succeeded, or AK_IDNotFound if the game object was not registered or the switch group name can not be found
 			/// \sa 
 			/// - \ref soundengine_switch
-			/// - \ref AK::SoundEngine::SetSwitch
 			AK_EXTERNAPIFUNC( AKRESULT, GetSwitch )( 
-				const wchar_t* in_pstrSwitchGroupName,		///< String name of the Switch Group
+				const wchar_t* in_pstrSwitchGroupName,			///< String name of the switch group
 				AkGameObjectID in_GameObj,					///< Associated game object ID
-				AkSwitchStateID& out_rSwitchState			///< ID of the Switch
+				AkSwitchStateID& out_rSwitchState			///< ID of the switch
 				);
 #endif //AK_SUPPORT_WCHAR
 
-			/// Get the current Switch value of the specified Switch Group, for a game object 
-			/// \return AK_Success if succeeded, or AK_IDNotFound if the game object was not registered or the Switch Group name cannot be found
+			/// Get the state of a switch group.
+			/// \return AK_Success if succeeded, or AK_IDNotFound if the game object was not registered or the switch group name can not be found
 			/// \sa 
 			/// - \ref soundengine_switch
-			/// - \ref AK::SoundEngine::SetSwitch
 			AK_EXTERNAPIFUNC( AKRESULT, GetSwitch )( 
-				const char* in_pstrSwitchGroupName,			///< String name of the Switch Group
+				const char* in_pstrSwitchGroupName,			///< String name of the switch group
 				AkGameObjectID in_GameObj,					///< Associated game object ID
-				AkSwitchStateID& out_rSwitchState			///< ID of the Switch
+				AkSwitchStateID& out_rSwitchState			///< ID of the switch
 				);
 
-			/// Get the current State value active in the specified State Group.
+			/// Get the state of a state group (by IDs).
 			/// \return AK_Success if succeeded
 			/// \sa 
 			/// - \ref soundengine_states
-			/// - \ref AK::SoundEngine::SetState
 			AK_EXTERNAPIFUNC( AKRESULT, GetState )( 
-				AkStateGroupID in_stateGroup, 				///< ID of the State Group
+				AkStateGroupID in_stateGroup, 				///< ID of the state group
 				AkStateID& out_rState 						///< ID of the state
 				);
 
 #ifdef AK_SUPPORT_WCHAR
-			/// Get the current State value active in the specified State Group.
-			/// \return AK_Success if succeeded
+			/// Get the state of a state group.
+			/// \return AK_Success if succeeded, or AK_IDNotFound if the state group name can not be found
 			/// \sa 
 			/// - \ref soundengine_states
-			/// - \ref AK::SoundEngine::SetState
 			AK_EXTERNAPIFUNC( AKRESULT, GetState )( 
-				const wchar_t* in_pstrStateGroupName,		///< String name of the State Group
-				AkStateID& out_rState						///< ID of the State
+				const wchar_t* in_pstrStateGroupName,			///< String name of the state group
+				AkStateID& out_rState						///< ID of the state
 				);
 #endif //AK_SUPPORT_WCHAR
 
-			/// Get the current State value active in the specified State Group.
-			/// \return AK_Success if succeeded
+			/// Get the state of a state group.
+			/// \return AK_Success if succeeded, or AK_IDNotFound if the state group name can not be found
 			/// \sa 
 			/// - \ref soundengine_states
-			/// - \ref AK::SoundEngine::SetState
 			AK_EXTERNAPIFUNC( AKRESULT, GetState )( 
-				const char* in_pstrStateGroupName,			///< String name of the State Group
-				AkStateID& out_rState						///< ID of the State
+				const char* in_pstrStateGroupName,			    ///< String name of the state group
+				AkStateID& out_rState						///< ID of the state
 				);
 
 			//@}
@@ -330,16 +301,18 @@ namespace AK
 			//@{
 
 			/// Get the environmental ratios used by the specified game object.
+			/// To clear the game object's environments, in_uNumEnvValues must be 0.
 			/// \sa 
 			/// - \ref soundengine_environments
 			/// - \ref soundengine_environments_dynamic_aux_bus_routing
 			/// - \ref soundengine_environments_id_vs_string
-			/// \return AK_Success if succeeded, or AK_InvalidParameter if io_ruNumSendValues is 0 or out_paEnvironmentValues is NULL, or AK_PartialSuccess if more environments exist than io_ruNumSendValues
+			/// \return AK_Success if succeeded, or AK_InvalidParameter if io_ruNumEnvValues is 0 or out_paEnvironmentValues is NULL, or AK_PartialSuccess if more environments exist than io_ruNumEnvValues
+			/// AK_InvalidParameter
 			AK_EXTERNAPIFUNC( AKRESULT, GetGameObjectAuxSendValues )( 
 				AkGameObjectID		in_gameObjectID,		///< Associated game object ID
 				AkAuxSendValue*		out_paAuxSendValues,	///< Variable-size array of AkAuxSendValue structures
 																///< (it may be NULL if no aux send must be set)
-				AkUInt32&			io_ruNumSendValues		///< The number of Auxiliary busses at the pointer's address
+				AkUInt32&			io_ruNumSendValues		///< The number of Auxilliary busses at the pointer's address
 															///< (it must be 0 if no aux bus is set)
 				);
 
@@ -486,11 +459,11 @@ namespace AK
 			///
 			/// \aknote The returned value is NOT the distance from a listener to an object but
 			/// the maximum attenuation distance of all sounds playing on this object. This is
-			/// not related in any way to the current 3D position of the object. \endaknote
+			/// not related in any way to the curent 3D position of the object. \endaknote
 			///
 			/// \return 
 			/// - AK_Success if succeeded
-			/// - AK_InsufficientMemory if there was not enough memory
+			/// - AK_InsuficientMemory if there was not enough memory
 			///
 			/// \aknote 
 			/// The Scaling factor (if one was specified on the game object) is included in the return value.

@@ -21,7 +21,7 @@ under the Apache License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
 OR CONDITIONS OF ANY KIND, either express or implied. See the Apache License for
 the specific language governing permissions and limitations under the License.
 
-  Copyright (c) 2026 Audiokinetic Inc.
+  Copyright (c) 2023 Audiokinetic Inc.
 *******************************************************************************/
 
 // AkCommonDefs.h
@@ -35,8 +35,9 @@ the specific language governing permissions and limitations under the License.
 
 #include <AK/SoundEngine/Common/AkSpeakerConfig.h>
 #include <AK/SoundEngine/Common/AkSpeakerVolumes.h>
-#include <AK/Tools/Common/AkBitFuncs.h>
-#include <AK/Tools/Common/AkAssert.h>
+#include <AK/SoundEngine/Common/IAkPluginMemAlloc.h>
+#include <AK/Tools/Common/AkArray.h>
+#include <AK/Tools/Common/AkString.h>
 
 //-----------------------------------------------------------------------------
 // AUDIO DATA FORMAT
@@ -125,7 +126,7 @@ struct AkAudioFormat
 		AkUInt32    in_uSampleRate,		///< Number of samples per second
 		AkChannelConfig in_channelConfig,	///< Channel configuration
 		AkUInt32    in_uBitsPerSample,	///< Number of bits per sample
-		AkUInt32    in_uBlockAlign,		///< Number of bytes per sample frame. (For example a 5.1 PCM 16bit should have a uBlockAlign equal to 6(5.1 channels)*2(16 bits per sample) = 12.
+		AkUInt32    in_uBlockAlign,		///< Block alignment
 		AkUInt32    in_uTypeID,			///< Data sample format (Float or Integer)
 		AkUInt32    in_uInterleaveID	///< Interleaved type
 		)
@@ -161,9 +162,18 @@ struct AkAudioFormat
 
 typedef AkUInt8(*AkChannelMappingFunc)(const AkChannelConfig &config, AkUInt8 idx);
 
+enum AkSourceChannelOrdering
+{
+	SourceChannelOrdering_Standard = 0, // SMPTE L-R-C-LFE-RL-RR-RC-SL-SR-HL-HR-HC-HRL-HRR-HRC-T
+	// or ACN ordering + SN3D norm
+
+	SourceChannelOrdering_Film,	// L/C/R/Ls/Rs/Lfe
+	SourceChannelOrdering_FuMa
+};
+
 #define AK_MAKE_CHANNELCONFIGOVERRIDE(_config,_order)	((AkInt64)_config.Serialize()|((AkInt64)_order<<32))
 #define AK_GET_CHANNELCONFIGOVERRIDE_CONFIG(_over)		(_over&UINT_MAX)
-#define AK_GET_CHANNELCONFIGOVERRIDE_ORDERING(_over)	((AK::AkChannelOrdering)(_over>>32))
+#define AK_GET_CHANNELCONFIGOVERRIDE_ORDERING(_over)	((AkSourceChannelOrdering)(_over>>32))
 
 // Build a 32 bit class identifier based on the Plug-in type,
 // CompanyID and PluginID.
@@ -238,7 +248,7 @@ struct Ak3dData
 	Ak3dData()
 		: spread(1.f)
 		, focus(1.f)
-		, uEmitterChannelMask(0xffffffff)
+		, uEmitterChannelMask(0xffff)
 	{
 		xform.Set(AK_DEFAULT_LISTENER_POSITION_X, AK_DEFAULT_LISTENER_POSITION_Y, AK_DEFAULT_LISTENER_POSITION_Z, AK_DEFAULT_LISTENER_FRONT_X, AK_DEFAULT_LISTENER_FRONT_Y, AK_DEFAULT_LISTENER_FRONT_Z, AK_DEFAULT_TOP_X, AK_DEFAULT_TOP_Y, AK_DEFAULT_TOP_Z);
 	}
@@ -278,6 +288,140 @@ struct AkPositioningData
 {
 	Ak3dData threeD;								///< 3D data used for 3D spatialization.
 	AkBehavioralPositioningData behavioral;			///< Positioning data inherited from sound structures and mix busses.
+};
+
+// Forward defines
+namespace AK
+{
+	class IAkPluginParam;
+}
+
+/// An audio object refers to an audio signal with some attached metadata going through the sound engine pipeline.
+/// The AkAudioObject struct encapsulates the metadata part. The signal itself is contained in a separate AkAudioBuffer instance.
+struct AkAudioObject
+{
+	/// Constructor
+	AkAudioObject()
+		:key(AK_INVALID_AUDIO_OBJECT_ID)
+		,cumulativeGain(1.f, 1.f)
+		,instigatorID(AK_INVALID_PIPELINE_ID)
+		,priority(AK_DEFAULT_PRIORITY)
+	{}
+
+	/// Destructor
+	~AkAudioObject()
+	{
+		arCustomMetadata.Term();
+		objectName.Term();
+	}
+
+	AkAudioObjectID key;			///< Unique ID, local to a given bus.
+
+	AkPositioningData positioning;	///< Positioning data for deferred 3D rendering.
+	AkRamp cumulativeGain;			///< Cumulative ramping gain to apply when mixing down to speaker bed or final endpoint
+
+	/// Custom object metadata.
+	struct CustomMetadata
+	{
+		AkPluginID pluginID;		///< Full plugin ID, including company ID and plugin type. See AKMAKECLASSID macro.
+		AK::IAkPluginParam* pParam;	///< Custom, pluggable medata.
+		AkUniqueID contextID;		///< (Profiling) ID of the sound or bus from which the custom metadata was fetched.
+	};
+
+	/// Array type for carrying custom metadata.
+	class ArrayCustomMetadata : public AkArray<CustomMetadata, const CustomMetadata&, AkPluginArrayAllocator>
+	{
+	public:
+		using ArrayType = AkArray<CustomMetadata, const CustomMetadata&, AkPluginArrayAllocator>;
+
+		ArrayType::Iterator FindByPluginID(AkPluginID pluginID) const
+		{
+			for (auto it = Begin(); it != End(); ++it)
+			{
+				if ((*it).pluginID == pluginID)
+					return it;
+			}
+			return End();
+		}
+	};
+
+	ArrayCustomMetadata arCustomMetadata;	///< Array of custom metadata, gathered from visited objects.
+
+	AkPipelineID instigatorID;		///< Profiling ID of the node from which the object stems (typically the voice, instance of an actor-mixer).
+
+	typedef AkString<AkPluginArrayAllocator, char> String;	///< String type for use in 3D audio objects.
+	String objectName;				///< Name string of the object, to appear in the object profiler. This is normally used by out-of-place object processors for naming their output objects. Built-in sound engine structures don't use it.
+
+	AkPriority priority;			///< Audio object playback priority. Object with a higher priority will be rendered using the hardware's object functionality on platforms that supports it, whereas objects with a lower priority will be downmixed to a lower resolution 3D bed. Audio object priorities should be retrieved, or set through IAkPluginServiceAudioObjectPriority to retain compatibility with future Wwise releases.
+
+	/// Copy object metadata (everything but the key) from another object.
+	void CopyContents(
+		const AkAudioObject& in_src	///< Object from which metadata is copied.
+	)
+	{
+		positioning = in_src.positioning;
+		cumulativeGain = in_src.cumulativeGain;
+		arCustomMetadata.Copy(in_src.arCustomMetadata);
+		instigatorID = in_src.instigatorID;
+		objectName = in_src.objectName;	// AkString performs a shallow copy when it can, like here.
+		priority = in_src.priority;
+	}
+
+	void SetCustomMetadata(CustomMetadata* in_aCustomMetadata, AkUInt32 in_uLength)
+	{
+		if (arCustomMetadata.Resize(in_uLength))
+		{
+			for (int i = 0; i < (int)in_uLength; ++i)
+			{
+				arCustomMetadata[i] = in_aCustomMetadata[i];
+			}
+		}
+	}
+
+	/// Transfer function for transfer move policies.
+	void Transfer(
+		AkAudioObject& in_from	///< Object from which data is transferred.
+	)
+	{
+		key = in_from.key;
+		positioning = in_from.positioning;
+		cumulativeGain = in_from.cumulativeGain;
+		arCustomMetadata.Transfer(in_from.arCustomMetadata);
+		instigatorID = in_from.instigatorID;
+		objectName.Transfer(in_from.objectName);
+		priority = in_from.priority;
+	}
+
+	/// Object processors may give an explicit name to objects. 
+	/// \return AK_Success if the string was allocated successfully, AK_InsufficientMemory otherwise.
+	AKRESULT SetName(
+		AK::IAkPluginMemAlloc* in_pAllocator,	///< Memory allocator.
+		const char* in_szName					///< Null-terminated string to allocate and store on this object.
+	)
+	{
+		objectName.Init(in_pAllocator);
+		objectName = in_szName;
+		return objectName.AllocCopy();
+	}
+
+	/// Reset object state in preparation for next frame.
+	void ResetState()
+	{
+		arCustomMetadata.Term(); // Reset custom metadata in preparation for next frame.
+		objectName.ClearReference(); // Clear reference to string in preparation for next frame.
+	}
+};
+
+/// Structure containing information about system-level support for 3D audio.
+/// "3D Audio" refers to a system's ability to position sound sources in a virtual 3D space, pan them accordingly on a range of physical speakers, and produce a binaural mix where appropriate.
+/// We prefer "3D Audio" to "Spatial" to avoid ambiguity with spatial audio, which typically involves sound propagation and environment effects.
+struct Ak3DAudioSinkCapabilities
+{
+	AkChannelConfig channelConfig;                 /// Channel configuration of the main mix.
+	AkUInt32        uMaxSystemAudioObjects;        /// Maximum number of System Audio Objects that can be active concurrently. A value of zero indicates the system does not support this feature.
+	AkUInt32        uAvailableSystemAudioObjects;  /// How many System Audio Objects can currently be sent to the sink. This value can change at runtime depending on what is playing. Can never be higher than uMaxSystemAudioObjects.
+	bool            bPassthrough;                  /// Separate  pass-through mix is supported.
+	bool            bMultiChannelObjects;          /// Can handle multi-channel objects
 };
 
 /// Enum of the possible object destinations when reaching a 3D audio-capable sink
@@ -413,7 +557,7 @@ public:
 	/// Access to channel data is most optimal through this method. Use whenever the
 	/// speaker configuration is known, or when an operation must be made independently
 	/// for each channel.
-	/// \remarks When using a standard Wwise pipeline configuration, use ChannelBitToIndex() to convert channel bits to buffer indices.
+	/// \remarks When using a standard configuration, use ChannelMaskToBufferIndex() to convert channel bits to buffer indices.
 	/// \return Address of the buffer of the ith channel.
 	/// \sa
 	/// - \ref fx_audiobuffer_struct
@@ -452,7 +596,7 @@ public:
 			AKASSERT(pData != nullptr);
 			for ( AkUInt32 i = 0; i < uNumChannels; ++i )
 			{
-				memset( GetChannel(i) + uNumCurrentFrames, 0, uNumZeroFrames * sizeof(AkSampleType) );
+				AKPLATFORM::AkMemSet( GetChannel(i) + uNumCurrentFrames, 0, uNumZeroFrames * sizeof(AkSampleType) );
 			}
 			uValidFrames = MaxFrames();
 		}
@@ -499,7 +643,21 @@ protected:
 	AkUInt16		uMaxFrames;			///< Number of sample frames the buffer can hold. Access through AkAudioBuffer::MaxFrames().
 
 public:
-	AkUInt16        uValidFrames;      ///< Number of valid sample frames in the audio buffer
+	AkUInt16        uValidFrames;       ///< Number of valid sample frames in the audio buffer
+};
+
+/// A collection of audio objects. Encapsulates the audio data and metadata of each audio object in separate arrays.
+struct AkAudioObjects
+{
+	AkAudioObjects(AkUInt32 in_uNumObjects = 0, AkAudioBuffer** in_ppObjectBuffers = nullptr, AkAudioObject** in_ppObjects = nullptr)
+		: uNumObjects(in_uNumObjects)
+		, ppObjectBuffers(in_ppObjectBuffers)
+		, ppObjects(in_ppObjects)
+	{}
+
+	AkUInt32 uNumObjects;				///< Number of audio objects.
+	AkAudioBuffer** ppObjectBuffers;	///< Array of pointers to audio object buffers.
+	AkAudioObject** ppObjects;			///< Array of pointers to audio objects.
 };
 
 #endif // _AK_COMMON_DEFS_H_

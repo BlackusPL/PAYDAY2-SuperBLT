@@ -2,6 +2,16 @@ cmake_minimum_required(VERSION 3.18)
 
 project(SuperBLT CXX C)
 
+# Create a .gitignore file in the build directory, since
+# it saves everyone from having to exclude their build
+# directories.
+# Meson does this by default which is really nice, it'd
+# be great if cmake could do that too.
+if (NOT EXISTS "${CMAKE_BINARY_DIR}/.gitignore")
+	message(STATUS "Creating .gitignore in the binary directory")
+	file(WRITE "${CMAKE_BINARY_DIR}/.gitignore" "*")
+endif ()
+
 ###############################################################################
 ## misc. definitions ##########################################################
 ###############################################################################
@@ -302,6 +312,24 @@ target_include_directories(diesel-wwise-bnk-version-converter PRIVATE lib/diesel
 # Include some namespace in the public include path, even if DieselWwiseSoundbank/src/ is ugly
 target_include_directories(diesel-wwise-bnk-version-converter PUBLIC lib/diesel-wwise-bnk-version-converter)
 target_link_libraries(SuperBLT diesel-wwise-bnk-version-converter)
+
+#### WWise bindings ####
+
+# Don't build the bindings automatically as that requires people to install the libclang pypi package
+set(WWISE_BINDING_GEN_C lib/ak_headers/wwise_bindings.gen.cpp)
+#set(WWISE_BINDING_GEN_C "${CMAKE_CURRENT_BINARY_DIR}/wwise_bindings.gen.cpp")
+#add_custom_command(
+#	OUTPUT "${WWISE_BINDING_GEN_C}"
+#	COMMAND ${Python3_EXECUTABLE} lib/ak_headers/generate_bindings.py --output "${WWISE_BINDING_GEN_C}"
+#	MAIN_DEPENDENCY lib/ak_headers/generate_bindings.py
+#	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+#)
+
+add_library(wwise "${WWISE_BINDING_GEN_C}")
+target_include_directories(wwise PUBLIC lib/ak_headers/include)
+
+target_link_libraries(SuperBLT wwise)
+
 
 ###############################################################################
 ## loader binary (this generates a seperate target for both Windows loaders) ##

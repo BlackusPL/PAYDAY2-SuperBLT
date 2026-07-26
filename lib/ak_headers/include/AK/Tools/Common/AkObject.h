@@ -21,12 +21,36 @@ under the Apache License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
 OR CONDITIONS OF ANY KIND, either express or implied. See the Apache License for
 the specific language governing permissions and limitations under the License.
 
-  Copyright (c) 2026 Audiokinetic Inc.
+  Copyright (c) 2023 Audiokinetic Inc.
 *******************************************************************************/
 
-#pragma once
+#ifndef _AK_OBJECT_H_
+#define _AK_OBJECT_H_
 
 #include <AK/SoundEngine/Common/AkMemoryMgr.h>
+
+//-----------------------------------------------------------------------------
+// Placement New definition. Use like this:
+// AkPlacementNew( memorybuffer ) T(); // where T is your type constructor
+//-----------------------------------------------------------------------------
+
+/// Unique structure identifier for AkPlacementNew.
+struct AkPlacementNewKey
+{
+	/// ctor
+	AkForceInline AkPlacementNewKey(){}
+};
+
+AkForceInline void * operator new( size_t /*size*/, void * memory, const AkPlacementNewKey & /*key*/ ) throw()
+{
+      return memory;
+}
+
+#define AkPlacementNew(_memory) ::new( _memory, AkPlacementNewKey() )
+
+// Matching operator delete for AK placement new. This needs to be defined to avoid compiler warnings
+// with projects built with exceptions enabled.
+AkForceInline void operator delete( void *, void *, const AkPlacementNewKey & ) throw() {}
 
 //-----------------------------------------------------------------------------
 // Macros
@@ -95,3 +119,4 @@ AkForceInline void AkDelete( AkMemPoolId in_PoolId, T * in_pObject )
 	}
 }
 
+#endif // _AK_OBJECT_H_

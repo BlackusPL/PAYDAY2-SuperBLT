@@ -21,7 +21,7 @@ under the Apache License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
 OR CONDITIONS OF ANY KIND, either express or implied. See the Apache License for
 the specific language governing permissions and limitations under the License.
 
-  Copyright (c) 2026 Audiokinetic Inc.
+  Copyright (c) 2023 Audiokinetic Inc.
 *******************************************************************************/
 
 #ifndef _AK_BANKREADHELPERS_H_
@@ -55,8 +55,6 @@ namespace AK
 	>
 	inline T ReadUnaligned(const AkUInt8* in_pVal)
 	{
-		static_assert(std::is_trivially_copyable<T>::value, "Unaligned operations require being trivially copiable");
-
 		T result;
 		AKPLATFORM::AkMemCpy(&result, in_pVal, sizeof(T));
 		return result;
@@ -69,21 +67,8 @@ namespace AK
 	inline void WriteUnaligned(AkUInt8* out_pVal, const T in_val)
 	{
 #if defined(__GNUC__)
-	#if defined(__has_warning)
-		#if __has_warning("-Walign-mismatch")
-			#define __IGNORE_RECENT_CLANG_WARNINGS
-			#pragma clang diagnostic push
-			#pragma clang diagnostic ignored "-Walign-mismatch"
-		#endif
-	#endif
-
 		typedef T __attribute__((aligned(1))) UnalignedT;
 		*reinterpret_cast<UnalignedT *>(out_pVal) = in_val;
-
-	#ifdef __IGNORE_RECENT_CLANG_WARNINGS
-		#undef __IGNORE_RECENT_CLANG_WARNINGS
-		#pragma clang diagnostic pop
-	#endif
 #elif defined(_MSC_VER) && !defined(AK_CPU_X86)
 		*reinterpret_cast<T __unaligned *>(out_pVal) = in_val; // __unaligned not supported on 32-bit x86
 #else
@@ -97,7 +82,6 @@ namespace AK
 	>
 	inline void WriteUnaligned(AkUInt8* out_pVal, const T& in_val)
 	{
-		static_assert(std::is_trivially_copyable<T>::value, "Unaligned operations require being trivially copiable");
 		AKPLATFORM::AkMemCpy(out_pVal, &in_val, sizeof(T));
 	}
 

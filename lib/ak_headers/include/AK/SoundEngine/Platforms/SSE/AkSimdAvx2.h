@@ -21,7 +21,7 @@ under the Apache License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
 OR CONDITIONS OF ANY KIND, either express or implied. See the Apache License for
 the specific language governing permissions and limitations under the License.
 
-  Copyright (c) 2026 Audiokinetic Inc.
+  Copyright (c) 2023 Audiokinetic Inc.
 *******************************************************************************/
 
 // AkSimdAvx2.h
@@ -40,6 +40,7 @@ the specific language governing permissions and limitations under the License.
 #endif
 
 #include <AK/SoundEngine/Platforms/SSE/AkSimdAvx.h>
+
 
 ////////////////////////////////////////////////////////////////////////
 /// @name AKSIMD arithmetic
@@ -117,8 +118,8 @@ static AkForceInline AKSIMD_V8F32 AKSIMD_COMPLEXMUL_AVX2(const AKSIMD_V8F32 cIn1
 /// Adds the eight integer values of a and b
 #define AKSIMD_ADD_V8I32( a, b ) _mm256_add_epi32( a, b )
 
-#define AKSIMD_CMPLT_V8I32( a, b ) _mm256_castsi256_ps(_mm256_cmpgt_epi32( b, a ))
-#define AKSIMD_CMPGT_V8I32( a, b ) _mm256_castsi256_ps(_mm256_cmpgt_epi32( a, b ))
+#define AKSIMD_CMPLT_V8I32( a, b ) _mm256_cmpgt_epi32( b, a )
+#define AKSIMD_CMPGT_V8I32( a, b ) _mm256_cmpgt_epi32( a, b )
 #define AKSIMD_OR_V8I32( a, b ) _mm256_or_si256(a,b)
 #define AKSIMD_XOR_V8I32( a, b ) _mm256_xor_si256(a,b)
 #define AKSIMD_SUB_V8I32( a, b ) _mm256_sub_epi32(a,b)
@@ -172,19 +173,6 @@ static AkForceInline AKSIMD_V8F32 AKSIMD_COMPLEXMUL_AVX2(const AKSIMD_V8F32 cIn1
 #define AKSIMD_SHIFTLEFT_V8I32( __vec__, __shiftBy__ ) \
 	_mm256_slli_epi32( (__vec__), (__shiftBy__) )
 
-/// Shifts the 8 signed or unsigned 32-bit integers in __vec__ left-wards by
-/// SIXTEEN bits while shifting in zeros (see _mm_shuffle_epi8)
-#define AKSIMD_SHIFTLEFT16_V8I32( __vec__ ) \
-	_mm256_shuffle_epi8( (__vec__), _mm256_set_epi8(  \
-		0xd, 0xc, -1, -1, \
-		0x9, 0x8, -1, -1, \
-		0x5, 0x4, -1, -1, \
-		0x1, 0x0, -1, -1, \
-		0xd, 0xc, -1, -1, \
-		0x9, 0x8, -1, -1, \
-		0x5, 0x4, -1, -1, \
-		0x1, 0x0, -1, -1) )
-
 /// Shifts the 8 signed 32-bit integers in a right by in_shiftBy
 /// bits while shifting in zeroes (see _mm_srli_epi32)
 #define AKSIMD_SHIFTRIGHT_V8I32( __vec__, __shiftBy__ ) \
@@ -210,7 +198,7 @@ static AkForceInline AKSIMD_V8F32 AKSIMD_COMPLEXMUL_AVX2(const AKSIMD_V8F32 cIn1
 /// This tends to perform better than a native VGATHER on most CPUs
 
 template <typename T, typename Function>
-static inline AKSIMD_V8I32 AKSIMD_GATHER_EPI32(const T* __restrict base_ptr, Function expr)
+inline AKSIMD_V8I32 AKSIMD_GATHER_EPI32(const T* __restrict base_ptr, Function expr)
 {
 	__m256i vals = _mm256_setzero_si256();
 	__m128i valsTemp[2] = { _mm_setzero_si128(),_mm_setzero_si128() };
@@ -234,7 +222,7 @@ static inline AKSIMD_V8I32 AKSIMD_GATHER_EPI32(const T* __restrict base_ptr, Fun
 }
 
 template <typename T, typename Function>
-static inline AKSIMD_V8I32 AKSIMD_GATHER_EPI64(const T* base_ptr, Function expr)
+inline AKSIMD_V8I32 AKSIMD_GATHER_EPI64(const T* base_ptr, Function expr)
 {
 	__m256i vals = _mm256_setzero_si256();
 	__m128i valsTemp[2] = { _mm_setzero_si128(),_mm_setzero_si128() };
@@ -254,13 +242,13 @@ static inline AKSIMD_V8I32 AKSIMD_GATHER_EPI64(const T* base_ptr, Function expr)
 }
 
 template <typename T, typename Function>
-static inline AKSIMD_V8F32 AKSIMD_GATHER_PS(const T* base_ptr, Function expr)
+inline AKSIMD_V8F32 AKSIMD_GATHER_PS(const T* base_ptr, Function expr)
 {
 	return _mm256_castsi256_ps(AKSIMD_GATHER_EPI32(base_ptr, expr));
 }
 
 template <typename T, typename Function>
-static inline AKSIMD_V4F64 AKSIMD_GATHER_PD(const T* base_ptr, Function expr)
+inline AKSIMD_V4F64 AKSIMD_GATHER_PD(const T* base_ptr, Function expr)
 {
 	return _mm256_castsi256_pd(AKSIMD_GATHER_EPI64(base_ptr, expr));
 }

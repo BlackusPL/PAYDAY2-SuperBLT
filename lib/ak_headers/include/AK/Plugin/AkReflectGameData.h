@@ -21,14 +21,85 @@ under the Apache License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
 OR CONDITIONS OF ANY KIND, either express or implied. See the Apache License for
 the specific language governing permissions and limitations under the License.
 
-  Copyright (c) 2026 Audiokinetic Inc.
+  Copyright (c) 2023 Audiokinetic Inc.
 *******************************************************************************/
 
 #ifndef _AK_REFLECT_GAMEDATA_H_
 #define _AK_REFLECT_GAMEDATA_H_
 
 #include <AK/SoundEngine/Common/AkTypes.h>
-#include <AK/SpatialAudio/Common/AkSpatialAudioTypes.h>
+
+#define AK_MAX_NUM_TEXTURE 4
+
+/// Data used to describe one image source in Reflect.
+struct AkImageSourceName
+{
+	AkImageSourceName()
+		: uNumChar(0)
+		, pName(NULL)
+	{
+	}
+
+	void SetName(const char * in_pName)
+	{
+		pName = in_pName;
+		if (pName)
+		{
+			uNumChar = (AkUInt32)strlen(in_pName);
+		}
+		else
+		{
+			uNumChar = 0;
+		}
+	}
+
+	AkUInt32 uNumChar;							///< Number of characters in image source name.
+	const char * pName;							///< Optional image source name. Appears in Reflect's editor when profiling.
+};
+
+struct AkImageSourceTexture
+{
+	AkImageSourceTexture()
+		: uNumTexture(1)
+	{
+		arTextureID[0] = AK_INVALID_UNIQUE_ID;
+	}
+
+	AkUInt32 uNumTexture;						///< Number of valid textures in the texture array.
+	AkUniqueID arTextureID[AK_MAX_NUM_TEXTURE];	///< Unique IDs of the Acoustics Texture ShareSets used to filter this image source.
+};
+
+struct AkImageSourceParams
+{
+	AkImageSourceParams()
+		: fDistanceScalingFactor(1.f)
+		, fLevel(1.f)
+		, fDiffraction(0.f)
+		, uDiffractionEmitterSide(0)
+		, uDiffractionListenerSide(0)
+	{
+		sourcePosition.X = 0.f;
+		sourcePosition.Y = 0.f;
+		sourcePosition.Z = 0.f;
+	}
+
+	AkImageSourceParams(AkVector64 in_sourcePosition, AkReal32 in_fDistanceScalingFactor, AkReal32 in_fLevel)
+		: sourcePosition(in_sourcePosition)
+		, fDistanceScalingFactor(in_fDistanceScalingFactor)
+		, fLevel(in_fLevel)
+		, fDiffraction(0.f)
+		, uDiffractionEmitterSide(0)
+		, uDiffractionListenerSide(0)
+	{
+	}
+
+	AkVector64 sourcePosition;					///< Image source position, relative to the world.
+	AkReal32 fDistanceScalingFactor;			///< Image source distance scaling. This number effectively scales the sourcePosition vector with respect to the listener and, consequently, scales distance and preserves orientation.
+	AkReal32 fLevel;							///< Game-controlled level for this source, linear.
+	AkReal32 fDiffraction;						///< Diffraction amount, normalized to the range [0,1].
+	AkUInt8 uDiffractionEmitterSide;			///< If there is a shadow zone diffraction just after the emitter in the reflection path, indicates the number of diffraction edges, otherwise 0 if no diffraction.
+	AkUInt8 uDiffractionListenerSide;			///< If there is a shadow zone diffraction before reaching the listener in the reflection path, indicates the number of diffraction edges, otherwise 0 if no diffraction.
+};
 
 struct AkReflectImageSource
 {
@@ -53,9 +124,9 @@ struct AkReflectImageSource
 	}
 
 	AkImageSourceID uID;						///< Image source ID (for matching delay lines across frames)
-	AkImageSourceParams params;					///< Image source properties
-	AkImageSourceTexture texture;				///< Image source's acoustic textures. Note that changing any of these textures across frames for a given image source, identified by uID, may result in a discontinuity in the audio signal.
-	AkImageSourceName name;						///< Image source name, for profiling.
+	AkImageSourceParams params;
+	AkImageSourceTexture texture;
+	AkImageSourceName name;
 };
 
 /// Data structure sent by the game to an instance of the Reflect plug-in.

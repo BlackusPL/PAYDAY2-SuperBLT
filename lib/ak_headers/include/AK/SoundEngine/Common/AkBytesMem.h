@@ -21,7 +21,7 @@ under the Apache License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
 OR CONDITIONS OF ANY KIND, either express or implied. See the Apache License for
 the specific language governing permissions and limitations under the License.
 
-  Copyright (c) 2026 Audiokinetic Inc.
+  Copyright (c) 2023 Audiokinetic Inc.
 *******************************************************************************/
 
 // AkBytesMem.h
@@ -72,8 +72,6 @@ namespace AK
 		AkInt32   m_cPos;
 	};
 
-	// In-memory buffer that can dynamically grow with use. 
-	// If you need something more lean to wrap a fixed memory area, consider using AK::InMemoryBuffer instead.
 	class WriteBytesMem
 		: public AK::IWriteBuffer
 	{

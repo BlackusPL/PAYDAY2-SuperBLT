@@ -21,7 +21,7 @@ under the Apache License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
 OR CONDITIONS OF ANY KIND, either express or implied. See the Apache License for
 the specific language governing permissions and limitations under the License.
 
-  Copyright (c) 2026 Audiokinetic Inc.
+  Copyright (c) 2023 Audiokinetic Inc.
 *******************************************************************************/
 
 // AkVectors.h
@@ -34,6 +34,7 @@ the specific language governing permissions and limitations under the License.
 #include <AK/SoundEngine/Common/AkSpeakerVolumes.h>
 #include <AK/SoundEngine/Common/IAkPluginMemAlloc.h>
 #include <AK/Tools/Common/AkArray.h>
+#include <AK/Tools/Common/AkObject.h>
 
 #include <math.h>
 #include <stdio.h>
@@ -503,11 +504,6 @@ public:
 		max.Z = AkMax(A.Z, B.Z);
 
 		return max;
-	}
-
-	AkForceInline bool Equals(const T3DVector& b, const TDataType tolerance = static_cast<TDataType>(0.0)) const
-	{
-		return fabs(X - b.X) <= tolerance && fabs(Y - b.Y) <= tolerance && fabs(Z - b.Z) <= tolerance;
 	}
 
 	//-----------------------------------------------------------

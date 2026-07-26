@@ -21,7 +21,7 @@ under the Apache License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
 OR CONDITIONS OF ANY KIND, either express or implied. See the Apache License for
 the specific language governing permissions and limitations under the License.
 
-  Copyright (c) 2026 Audiokinetic Inc.
+  Copyright (c) 2023 Audiokinetic Inc.
 *******************************************************************************/
 
 #ifndef _AK_ACOUSTICTEXTURE_H_
@@ -58,16 +58,6 @@ struct AkAcousticTexture
 	,fAbsorptionHigh(in_fAbsorptionHigh)
 	,fScattering(in_fScattering)
 	{
-	}
-
-	static bool Same(const AkAcousticTexture& lhs, const AkAcousticTexture& rhs)
-	{
-		return lhs.fAbsorptionLow == rhs.fAbsorptionLow &&
-			lhs.fAbsorptionMidLow == rhs.fAbsorptionMidLow &&
-			lhs.fAbsorptionMidHigh == rhs.fAbsorptionMidHigh &&
-			lhs.fAbsorptionHigh == rhs.fAbsorptionHigh &&
-			lhs.fAbsorptionOffset == rhs.fAbsorptionOffset &&
-			lhs.fScattering == rhs.fScattering;
 	}
 
 	AkUInt32						ID;

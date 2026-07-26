@@ -21,7 +21,7 @@ under the Apache License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
 OR CONDITIONS OF ANY KIND, either express or implied. See the Apache License for
 the specific language governing permissions and limitations under the License.
 
-  Copyright (c) 2026 Audiokinetic Inc.
+  Copyright (c) 2023 Audiokinetic Inc.
 *******************************************************************************/
 
 // AkTypes.h
@@ -43,7 +43,7 @@ the specific language governing permissions and limitations under the License.
 #endif
 
 #define AK_RESTRICT		__restrict				///< Refers to the __restrict compilation flag available on some platforms
-#define AK_EXPECT_FALSE( _x )	(__builtin_expect( _x, 0))
+#define AK_EXPECT_FALSE( _x )	(_x)
 #ifndef AkForceInline
 #define AkForceInline	inline					///< Force inlining
 #endif

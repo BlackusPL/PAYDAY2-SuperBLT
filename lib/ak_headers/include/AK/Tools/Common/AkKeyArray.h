@@ -21,7 +21,7 @@ under the Apache License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
 OR CONDITIONS OF ANY KIND, either express or implied. See the Apache License for
 the specific language governing permissions and limitations under the License.
 
-  Copyright (c) 2026 Audiokinetic Inc.
+  Copyright (c) 2023 Audiokinetic Inc.
 *******************************************************************************/
 
 #ifndef _KEYARRAY_H_
@@ -185,13 +185,13 @@ template <class T_KEY> struct AkDefaultSortedKeyCompare
 {
 public:
 	template<class THIS_CLASS>
-	static AkForceInline bool Lesser(THIS_CLASS*, const T_KEY &a, const T_KEY &b)
+	static AkForceInline bool Lesser(THIS_CLASS*, T_KEY &a, T_KEY &b)
 	{
 		return a < b;
 	}
 
 	template<class THIS_CLASS>
-	static AkForceInline bool Equal(THIS_CLASS*, const T_KEY &a, const T_KEY &b)
+	static AkForceInline bool Equal(THIS_CLASS*, T_KEY &a, T_KEY &b)
 	{
 		return a == b;
 	}
@@ -206,25 +206,14 @@ public:
 	using base = AkArray<T_ITEM, const T_ITEM&, U_POOL, TGrowBy, TMovePolicy>;
 	using Iterator = typename base::Iterator;
 
-	AkForceInline bool Lesser(const T_KEY &a, const T_KEY &b) const
+	AkForceInline bool Lesser(T_KEY &a, T_KEY &b) const
 	{
 		return TComparePolicy::Lesser((void*)this, a, b);
 	}
 
-	AkForceInline bool Equal(const T_KEY &a, const T_KEY &b) const
+	AkForceInline bool Equal(T_KEY &a, T_KEY &b) const
 	{
 		return TComparePolicy::Equal((void*)this, a, b);
-	}
-
-	AkUInt32 GetIndex(T_ITEM* in_pItem) const
-	{
-		if (this->m_pItems && this->m_uLength > 0)
-		{
-			AkUInt32 index = (AkUInt32)(in_pItem - this->m_pItems);
-			if ((this->m_pItems + index) == in_pItem)
-				return index;
-		}
-		return this->m_uLength;
 	}
 
 	T_ITEM* Exists(T_KEY in_key) const	
@@ -301,6 +290,7 @@ public:
 		return pItem;
 	}
 
+
 	bool Unset(T_KEY in_key)
 	{
 		T_ITEM * pItem = Exists(in_key);
@@ -313,127 +303,6 @@ public:
 		}
 
 		return false;
-	}
-
-	// Replace current sorted items with a list of sorted updates.
-	// - Walks both arrays (current and updates), and calls user provided functions on each comparison.
-	// - Returns false on any error. Always completes walks of both arrays.
-	// - fnExists = void (T_ITEM& in_item, const tUpdate& in_update);
-	// - fnNew = void (T_ITEM& in_item, const tUpdate& in_update);
-	// - fnOld = bool (T_ITEM& in_item); // return value indicates if entry should be deleted.
-	template <typename T_UPDATE>
-	struct GetUpdateKey
-	{
-		static const T_KEY& Get(const T_UPDATE& in) { return in; }
-	};
-
-	template <
-		typename T_UPDATE,
-		typename U_UPDATEKEY = GetUpdateKey<T_UPDATE>,
-		typename FN_EXISTS = void (*)(T_ITEM&, const T_UPDATE&),
-		typename FN_NEW = void (*)(T_ITEM&, const T_UPDATE&),
-		typename FN_OLD = void (*)(T_ITEM&)
-	>
-	bool SortedUpdate(AkUInt32 in_numUpdates, const T_UPDATE* in_pUpdates, FN_EXISTS in_fnExists, FN_NEW in_fnNew, FN_OLD in_fnOld)
-	{
-		#ifndef AK_OPTIMIZED
-			// Updates must be sorted.
-			for (AkUInt32 i = 1; i < in_numUpdates; ++i)
-			{
-				const T_KEY& a = U_UPDATEKEY::Get(in_pUpdates[i-1]);
-				const T_KEY& b = U_UPDATEKEY::Get(in_pUpdates[i]);
-				if (!Lesser(a, b) && !Equal(a, b))
-				{
-					AKASSERT(!"AkSortedKeyArray::SortedUpdate, input not sorted!");
-					return false;
-				}
-			}
-
-			// Array must be sorted.
-			for (AkUInt32 i = 1; i < this->Length(); ++i)
-			{
-				T_KEY& a = U_KEY::Get(this->m_pItems[i-1]);
-				T_KEY& b = U_KEY::Get(this->m_pItems[i]);
-				if (!Lesser(a, b) && !Equal(a, b))
-				{
-					AKASSERT(!"AkSortedKeyArray::SortedUpdate, array not sorted!");
-					return false;
-				}
-			}
-		#endif
-
-		bool bResult = true;
-
-		// Walk through both arrays while not having reached the end of either.
-		AkUInt32 oldIdx = 0, newIdx = 0;
-		while (oldIdx < this->Length() && newIdx < in_numUpdates)
-		{
-			T_ITEM& oldItem = this->m_pItems[oldIdx];
-			T_KEY& oldKey = U_KEY::Get(oldItem);
-
-			const T_UPDATE& newItem = in_pUpdates[newIdx];
-			const T_KEY& newKey = U_UPDATEKEY::Get(newItem);
-
-			if (Equal(oldKey, newKey))
-			{
-				// Common item. Call user function, then move one.
-				in_fnExists(oldItem, newItem);
-				++oldIdx;
-				++newIdx;
-			}
-			else if (Lesser(oldKey, newKey))
-			{
-				// Call user function; return value determines if we delete the entry.
-				if (in_fnOld(oldItem))
-					this->Erase(oldIdx);
-				else
-					++oldIdx;
-
-				// Don't increment oldIdx!
-			}
-			else // if (oldKey > newKey)
-			{
-				// New entry. Insert, then call user function.
-				T_ITEM* pNew = this->Insert(oldIdx);
-				if (pNew)
-				{
-					U_KEY::Get(*pNew) = newKey;
-					in_fnNew(*pNew, newItem);
-					++oldIdx;
-				}
-				else
-					bResult = false;
-
-				++newIdx;
-			}
-		}
-
-		// Remove any leftover old items.
-		while (oldIdx < this->Length())
-		{
-			if (in_fnOld(this->m_pItems[oldIdx]))
-				this->Erase(oldIdx);
-			else
-				++oldIdx;
-		}
-
-		// Add any leftover new items.
-		for (; newIdx < in_numUpdates; ++newIdx)
-		{
-			const T_UPDATE& newItem = in_pUpdates[newIdx];
-			const T_KEY& newKey = U_UPDATEKEY::Get(newItem);
-
-			T_ITEM* pNew = this->AddLast();
-			if (pNew)
-			{
-				U_KEY::Get(*pNew) = newKey;
-				in_fnNew(*pNew, newItem);
-			}
-			else
-				bResult = false;
-		}
-
-		return bResult;
 	}
 
 	// WARNING: Do not use on types that need constructors or destructor called on Item objects at each creation.

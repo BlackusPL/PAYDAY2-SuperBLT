@@ -21,7 +21,7 @@ under the Apache License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
 OR CONDITIONS OF ANY KIND, either express or implied. See the Apache License for
 the specific language governing permissions and limitations under the License.
 
-  Copyright (c) 2026 Audiokinetic Inc.
+  Copyright (c) 2023 Audiokinetic Inc.
 *******************************************************************************/
 
 #ifndef _AKMONITORERROR_H
@@ -83,7 +83,7 @@ namespace AK
 			ErrorCode_FileNotFound, 
 			ErrorCode_CannotOpenFile,
 			ErrorCode_CannotStartStreamNoMemory,
-			ErrorCode_IODeviceStr,
+			ErrorCode_IODevice,
 			ErrorCode_IncompatibleIOSettings,
 
 			ErrorCode_PluginUnsupportedChannelConfiguration,
@@ -126,6 +126,9 @@ namespace AK
 			ErrorCode_MediaNotLoaded,
 			ErrorCode_VoiceStarving,
 			ErrorCode_StreamingSourceStarving,
+			ErrorCode_XMADecoderSourceStarving,
+			ErrorCode_XMADecodingError,
+			ErrorCode_InvalidXMAData,
 
 			ErrorCode_PluginNotRegistered,
 			ErrorCode_CodecNotRegistered,
@@ -158,6 +161,9 @@ namespace AK
 
 			ErrorCode_CommandQueueFull,
 			ErrorCode_CommandTooLarge,
+
+			ErrorCode_XMACreateDecoderLimitReached,
+			ErrorCode_XMAStreamBufferTooSmall,
 
 			ErrorCode_ModulatorScopeError_Inst,
 			ErrorCode_ModulatorScopeError_Obj,
@@ -259,17 +265,17 @@ namespace AK
 			
 			ErrorCode_NotEnoughMemInFunction,
 			ErrorCode_FXNotFound,
+			ErrorCode_SetMixerNotABus,
 			ErrorCode_AudioNodeNotFound,
+			ErrorCode_SetMixerFailed,
 			ErrorCode_SetBusConfigUnsupported,
 			ErrorCode_BusNotFound,
 
 			ErrorCode_MismatchingMediaSize,
 			ErrorCode_IncompatibleBankVersion,
 			ErrorCode_UnexpectedPrepareGameSyncsCall,
+			ErrorCode_MusicEngineNotInitialized,
 			ErrorCode_LoadingBankMismatch,
-
-			ErrorCode_ProxyObjectMismatch,
-			ErrorCode_ProxyObjectMemory,
 
 			ErrorCode_MasterBusStructureNotLoaded,
 			ErrorCode_TooManyChildren,
@@ -280,6 +286,11 @@ namespace AK
 			ErrorCode_NXDeviceRegistrationFailed,
 			ErrorCode_MixPluginOnObjectBus,
 
+			ErrorCode_XboxXMAVoiceResetFailed,
+			ErrorCode_XboxACPMessage,
+			ErrorCode_XboxFrameDropped,
+			ErrorCode_XboxACPError,
+			ErrorCode_XboxXMAFatalError,
 			ErrorCode_MissingMusicNodeParent,
 			ErrorCode_HardwareOpusDecoderError,
 			ErrorCode_SetGeometryTooManyTriangleConnected,
@@ -298,7 +309,7 @@ namespace AK
 			ErrorCode_PlayingTriggerRateNotSupported,
 			ErrorCode_SetGeometryTriangleIsSkipped,
 			ErrorCode_SetGeometryInstanceInvalidTransform,
-
+			
 			//AkSpatialAudio:AkMonitorError_WithID
 			ErrorCode_SetGameObjectRadiusSizeError,
 			ErrorCode_SetPortalNonDistinctRoom,
@@ -344,42 +355,6 @@ namespace AK
 			ErrorCode_IODeviceInitFailed,
 			ErrorCode_SwitchListEmpty,
 			ErrorCode_NoSwitchSelected,
-			ErrorCode_FilePermissionError,
-
-			ErrorCode_SetEffectOnRendered,
-			ErrorCode_GeometryNotWatertight,
-			
-			ErrorCode_CannotInitialize3DAudio,
-			ErrorCode_CannotInitializeInputCallbacks,
-			ErrorCode_CannotConnectAVAudioEngineSource,
-			
-			ErrorCode_ChannelConfigRequestDenied,
-			ErrorCode_MediaUpdatedFromWwise,
-			ErrorCode_MediaErrorFromWwise,
-			ErrorCode_OutputAlreadyExists,
-			ErrorCode_UnknownStateGroup,
-			ErrorCode_MediaErrorWwiseMRUFull,
-			ErrorCode_AudioOut2ContextCreateError,
-			ErrorCode_AudioOut2UserCreateError,
-
-			ErrorCode_FeedbackOnAudioObjectsBus,
-			
-			ErrorCode_SpatialAudio_SiblingPortal,
-			ErrorCode_ActivityPlayback_Warning,
-
-			ErrorCode_CannotPlaySource_FileAccess,
-			ErrorCode_MediaDiscrepancy,
-			ErrorCode_WwiseIODisconnected,
-			ErrorCode_WwiseIODisconnectedStr,
-			ErrorCode_IODevice,
-
-			ErrorCode_InvalidCommand,
-			ErrorCode_PlayingIDAlreadyExists,
-			ErrorCode_IOStreamLeak,
-
-			ErrorCode_SetSidechainMixConfigInvalid,
-
-			ErrorCode_NodeNotCompatibleWithMidi,
 
 			// ALWAYS ADD NEW CODES AT THE END !!!!!!!
 			// Otherwise it may break comm compatibility in a patch
@@ -387,7 +362,7 @@ namespace AK
 			Num_ErrorCodes // THIS STAYS AT END OF ENUM
 		};
 
-		static_assert(Num_ErrorCodes == 227,
+		static_assert(Num_ErrorCodes == 211,
 			"Please document your new ErrorCode "
 			"in 'Documentation/Help/source_en/reference/common_errors_capture_log.xml', "
 			"then you can increment this value."
@@ -483,7 +458,7 @@ namespace AK
 
 		/// Add a translator to the wwiseErrorHandler
 		/// The additional translators increase the chance of a monitoring messages or errors
-		/// to be successfully translated.
+		/// to be succeffully translated.
 		/// \return AK_Success.
 		///	In optimized/release configuration, this function returns AK_NotCompatible.
 		AK_EXTERNAPIFUNC( AKRESULT, AddTranslator )(

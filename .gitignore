@@ -2,9 +2,6 @@
 /.vs
 /out
 
-# CMake build directory
-/build/
-
 # Swap files
 .*.swp
 

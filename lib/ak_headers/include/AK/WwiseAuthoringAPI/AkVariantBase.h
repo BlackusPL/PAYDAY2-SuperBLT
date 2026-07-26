@@ -21,7 +21,7 @@ under the Apache License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
 OR CONDITIONS OF ANY KIND, either express or implied. See the Apache License for
 the specific language governing permissions and limitations under the License.
 
-  Copyright (c) 2026 Audiokinetic Inc.
+  Copyright (c) 2023 Audiokinetic Inc.
 *******************************************************************************/
 
 #pragma once
@@ -61,6 +61,7 @@ namespace AK
 			AkVariantType_bool,
 
 			AkVariantType_string,
+			AkVariantType_wstring,
 			AkVariantType_guid
 		};
 
@@ -91,7 +92,7 @@ namespace AK
 				CopyFrom(other);
 			}
 
-			inline AkVariantBase(AkVariantBase&& other) noexcept
+			inline AkVariantBase(AkVariantBase&& other)
 			{
 				Nullify();
 				CopyFrom(other);
@@ -128,9 +129,20 @@ namespace AK
 			}
 #endif
 
+			inline AkVariantBase(const wchar_t* in_val)
+			{
+				m_data = new std::wstring(in_val);
+				m_eType = AkVariantType_wstring;
+			}
+
+			inline AkVariantBase(const std::wstring& in_val)
+				: AkVariantBase(in_val.c_str())
+			{
+			}
+
 			inline AkVariantBase(const char* in_val)
 			{
-				m_data = new std::string(in_val ? in_val : "");
+				m_data = new std::string(in_val);
 				m_eType = AkVariantType_string;
 			}
 
@@ -167,17 +179,32 @@ namespace AK
 			inline AkVariantBase& operator=(const AkGuid& in_val)
 			{
 				Clear();
-				AkGuid* guid = new AkGuid();
+				AkGuid*guid = new AkGuid();
 				memcpy(guid, &in_val, sizeof(AkGuid));
 				m_eType = AkVariantType_guid;
-				m_data = guid;
+				return *this;
+			}
+
+			inline AkVariantBase& operator=(const wchar_t* in_val)
+			{
+				Clear();
+				m_data = new std::wstring(in_val);
+				m_eType = AkVariantType_wstring;
+				return *this;
+			}
+
+			inline AkVariantBase& operator=(const std::wstring& in_val)
+			{
+				Clear();
+				m_data = new std::wstring(in_val);
+				m_eType = AkVariantType_wstring;
 				return *this;
 			}
 
 			inline AkVariantBase& operator=(const char* in_val)
 			{
 				Clear();
-				m_data = new std::string(in_val ? in_val : "");
+				m_data = new std::string(in_val);
 				m_eType = AkVariantType_string;
 				return *this;
 			}
@@ -202,6 +229,17 @@ namespace AK
 				return (m_eType == AkVariantType_guid);
 			}
 
+			inline bool IsWString() const
+			{
+				return (m_eType == AkVariantType_wstring);
+			}
+
+			inline const std::wstring& GetWString() const
+			{
+				AKASSERT(m_eType == AkVariantType_wstring && "AkVariant: illegal typecast");
+				return *static_cast<const std::wstring*>(m_data);
+			}
+			
 			const std::string& GetString() const
 			{
 				if (m_eType == AkVariantType_guid)
@@ -300,16 +338,15 @@ namespace AK
 				case AkVariantType_bool: return m_boolean == rhs.m_boolean;
 
 				case AkVariantType_string: return GetString().compare(rhs.GetString()) == 0;
+				case AkVariantType_wstring: return GetWString().compare(rhs.GetWString()) == 0;
+
 				case AkVariantType_guid: return GetGuid() == rhs.GetGuid();
-				case AkVariantType_none: return true; // Both variants are empty
+				default:
+					AKASSERT(false && "Trying to convert an AkVariant that doesn't contain a basic type");
 				}
-				return false; // Unknown type
+				return false;
 			}
 
-			inline bool operator!=(const AkVariantBase& rhs) const
-			{
-				return !(*this == rhs);
-			}
 
 			// Typecast ----------------------------------------------------------------------------
 
@@ -438,6 +475,15 @@ namespace AK
 				return AkGuid();
 			}
 
+			inline operator std::wstring() const
+			{
+				if(m_eType == AkVariantType_wstring )
+					return *static_cast<const std::wstring*>(m_data);
+
+				AKASSERT(false && "AkVariantBase: illegal typecast");
+				return std::wstring();
+			}
+
 			inline operator std::string() const
 			{
 				if (m_eType == AkVariantType_string)
@@ -454,17 +500,6 @@ namespace AK
 				return (m_eType >= AkVariantType_int8 && m_eType <= AkVariantType_int64)
 					|| (m_eType >= AkVariantType_uint8 && m_eType <= AkVariantType_uint64)
 					|| (m_eType >= AkVariantType_real32 && m_eType <= AkVariantType_real64);
-			}
-
-			inline bool IsInteger() const
-			{
-				return (m_eType >= AkVariantType_int8 && m_eType <= AkVariantType_int64)
-					|| (m_eType >= AkVariantType_uint8 && m_eType <= AkVariantType_uint64);
-			}
-
-			inline bool IsReal() const
-			{
-				return (m_eType >= AkVariantType_real32 && m_eType <= AkVariantType_real64);
 			}
 
 			inline bool IsEmpty() const
@@ -674,6 +709,9 @@ namespace AK
 				case AkVariantType_string:
 					delete static_cast<std::string*>(m_data);
 					break;
+				case AkVariantType_wstring:
+					delete static_cast<std::wstring*>(m_data);
+					break;
 				case AkVariantType_guid:
 					delete static_cast<AkGuid*>(m_data);
 					break;
@@ -721,6 +759,9 @@ namespace AK
 					break;
 				case AkVariantType_string:
 					m_data = new std::string(*static_cast<const std::string*>(in_var.m_data));
+					break;
+				case AkVariantType_wstring:
+					m_data = new std::wstring(*static_cast<const std::wstring*>(in_var.m_data));
 					break;
 				case AkVariantType_guid:
 					m_data = new AkGuid();
@@ -807,63 +848,40 @@ namespace AK
 			// Implicit interface supporting conversion to rapidjson. Does not require rapidjson dependencies
 			// if the function is not called.
 			template<typename RapidJsonValueType, typename RapidJsonAllocator, typename RapidJsonSizeType>
-			bool toRapidJsonValue(RapidJsonValueType& out_rapidJson, RapidJsonAllocator& in_allocator) const
+			bool toRapidJsonValue(RapidJsonValueType out_rapidJson, RapidJsonAllocator in_allocator) const
 			{
 				switch (m_eType)
 				{
-				case AkVariantType_none:
-					out_rapidJson.SetNull();
-					return true;
+				case AkVariantType_none: out_rapidJson.SetNull(); break;
 
-				case AkVariantType_bool:
-					out_rapidJson.SetBool(m_boolean);
-					return true;
+				case AkVariantType_bool: out_rapidJson.SetBool(m_boolean); break;
 
-				case AkVariantType_int8:
-					out_rapidJson.SetInt(m_int8);
-					return true;
-				case AkVariantType_int16:
-					out_rapidJson.SetInt(m_int16);
-					return true;
-				case AkVariantType_int32:
-					out_rapidJson.SetInt(m_int32);
-					return true;
-				case AkVariantType_int64:
-					out_rapidJson.SetInt64(m_int64);
-					return true;
+				case AkVariantType_int8: out_rapidJson.SetInt(m_int8); break;
+				case AkVariantType_int16: out_rapidJson.SetInt(m_int16); break;
+				case AkVariantType_int32: out_rapidJson.SetInt(m_int32); break;
+				case AkVariantType_int64: out_rapidJson.SetInt64(m_int64); break;
 
-				case AkVariantType_uint8:
-					out_rapidJson.SetUint(m_uint8);
-					return true;
-				case AkVariantType_uint16:
-					out_rapidJson.SetUint(m_uint16);
-					return true;
-				case AkVariantType_uint32:
-					out_rapidJson.SetUint(m_uint32);
-					return true;
-				case AkVariantType_uint64:
-					out_rapidJson.SetUint64(m_uint64);
-					return true;
+				case AkVariantType_uint8: out_rapidJson.SetUint(m_uint8); break;
+				case AkVariantType_uint16: out_rapidJson.SetUint(m_uint16); break;
+				case AkVariantType_uint32: out_rapidJson.SetUint(m_uint32); break;
+				case AkVariantType_uint64: out_rapidJson.SetUint64(m_uint64); break;
 
-				case AkVariantType_real32:
-					out_rapidJson.SetDouble(m_real32);
-					return true;
-				case AkVariantType_real64:
-					out_rapidJson.SetDouble(m_real64);
-					return true;
-
-				case AkVariantType_string:
-					break; // Requires locale conversion
+				case AkVariantType_real32: out_rapidJson.SetDouble(m_real32); break;
+				case AkVariantType_real64: out_rapidJson.SetDouble(m_real64); break;
 
 				case AkVariantType_guid:
 				{
 					std::string str;
 					AkVariantBase::AkGuidToStr(*static_cast<const AkGuid*>(m_data), str);
 					out_rapidJson.SetString(str.c_str(), static_cast<RapidJsonSizeType>(str.length()), in_allocator);
-					return true;
 				}
+				break;
+
+				default:
+					return false;
 				}
-				return false;
+
+				return true;
 			}
 
 		protected:

@@ -21,14 +21,14 @@ under the Apache License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
 OR CONDITIONS OF ANY KIND, either express or implied. See the Apache License for
 the specific language governing permissions and limitations under the License.
 
-  Copyright (c) 2026 Audiokinetic Inc.
+  Copyright (c) 2023 Audiokinetic Inc.
 *******************************************************************************/
 
 #ifndef _AKMURMURHASH_H_
 #define _AKMURMURHASH_H_
 
 #include <AK/SoundEngine/Common/AkTypes.h>
-#include <AK/Tools/Common/AkBitFuncs.h>
+#include <AK/Tools/Common/AkPlatformFuncs.h>
 
 // https://github.com/aappleby/smhasher/blob/master/src/MurmurHash3.cpp
 
@@ -84,18 +84,6 @@ AkForceInline void AkHashMurMur32( AkUInt32* pHash, const void* pData, size_t uS
 	uH1 ^= uSize;
 	uH1 = AkHashMurMurMix32( uH1 );
 	*pHash = uH1;
-}
-
-// Given an already hashed/mixed uHash, mix in uExtraValue as well
-AkForceInline AkUInt32 AkHashMurMurMixExtra32(AkUInt32 uHash, AkUInt32 uExtraValue)
-{
-	uExtraValue *= MURMUR3_C1;
-	uExtraValue = AK::ROTL32(uExtraValue, 15);
-	uExtraValue *= MURMUR3_C2;
-	uHash ^= uExtraValue;
-	uHash = AK::ROTL32(uHash, 13);
-	uHash = uHash * 5 + MURMUR3_C3;
-	return uHash;
 }
 
 #endif // _AKMURMURHASH_H_

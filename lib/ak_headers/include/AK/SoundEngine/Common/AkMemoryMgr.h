@@ -21,7 +21,7 @@ under the Apache License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
 OR CONDITIONS OF ANY KIND, either express or implied. See the Apache License for
 the specific language governing permissions and limitations under the License.
 
-  Copyright (c) 2026 Audiokinetic Inc.
+  Copyright (c) 2023 Audiokinetic Inc.
 *******************************************************************************/
 
 /// \file
@@ -42,37 +42,34 @@ the specific language governing permissions and limitations under the License.
 struct AkMemSettings;
 
 /// Memory category IDs.
-/// If this is modified, the Comm version should be bumped as well, to keep Authoring in line
 enum AkMemID
 {
-	AkMemID_Object,                 ///< Generic placeholder for allocations tied to the Wwise project.
-	AkMemID_Event,                  ///< Events from the Wwise project.
-	AkMemID_Structure,              ///< Structures from the Wwise project.
-	AkMemID_Media,                  ///< Media from the Wwise project.
-	AkMemID_GameObject,             ///< Game Objects and related.
-	AkMemID_Processing,             ///< Anything tied to instancing and processing of the DSP graph.
-	AkMemID_ProcessingPlugin,       ///< Plug-in allocations related to the DSP graph.
-	AkMemID_Streaming,              ///< Streaming Manager objects.
-	AkMemID_StreamingIO,            ///< Streaming Manager I/O memory.
-	AkMemID_SpatialAudio,           ///< Spatial audio.
-	AkMemID_SpatialAudioGeometry,   ///< Spatial audio geometry data.
-	AkMemID_SpatialAudioPaths,      ///< Spatial audio paths data.
-	AkMemID_GameSim,                ///< Game Simulator allocations.
-	AkMemID_MonitorQueue,           ///< Monitor Queue.
-	AkMemID_Profiler,               ///< Profiler.
-	AkMemID_FilePackage,            ///< File packager.
-	AkMemID_SoundEngine,            ///< Base sound engine allocations (managers, etc).
-	AkMemID_Integration,            ///< Game engine integration allocations.
+	AkMemID_Object,					///< Generic placeholder for allocations tied to the Wwise project.
+	AkMemID_Event,					///< Events from the Wwise project.
+	AkMemID_Structure,				///< Structures from the Wwise project.
+	AkMemID_Media,					///< Media from the Wwise project.
+	AkMemID_GameObject,				///< Game Objects and related.
+	AkMemID_Processing,				///< Anything tied to instancing and processing of the DSP graph.
+	AkMemID_ProcessingPlugin,		///< Plug-in allocations related to the DSP graph.
+	AkMemID_Streaming,				///< Streaming Manager objects.
+	AkMemID_StreamingIO,			///< Streaming Manager I/O memory.
+	AkMemID_SpatialAudio,			///< Spatial audio.
+	AkMemID_SpatialAudioGeometry,	///< Spatial audio geometry data.
+	AkMemID_SpatialAudioPaths,		///< Spatial audio paths data.
+	AkMemID_GameSim,				///< Game Simulator allocations.
+	AkMemID_MonitorQueue,			///< Monitor Queue.
+	AkMemID_Profiler,				///< Profiler.
+	AkMemID_FilePackage,			///< File packager.
+	AkMemID_SoundEngine,			///< Base sound engine allocations (managers, etc).
+	AkMemID_Integration,			///< Game engine integration allocations.
 	AkMemID_JobMgr,                 ///< Allocations for Sound Engine jobs and job dependencies.
-	AkMemID_TempAudioRender,        ///< Temporary allocations for audio render.
-	AkMemID_BookmarkAlloc,          ///< Allocations serviced by the bookmark allocator
 
-	AkMemID_NUM,                    ///< Category count.
-	AkMemID_MASK = 0x1FFFFFFF,      ///< Mask for category IDs.
+	AkMemID_NUM,					///< Category count.
+	AkMemID_MASK = 0x1FFFFFFF,		///< Mask for category IDs.
 
-	AkMemType_Media = 0x20000000,   ///< Media memory type bit.
-	AkMemType_Device = 0x40000000,  ///< Device memory type bit.
-	AkMemType_NoTrack = 0x80000000  ///< Do not track this allocation.
+	AkMemType_Media = 0x20000000,	///< Media memory type bit.
+	AkMemType_Device = 0x40000000,	///< Device memory type bit.
+	AkMemType_NoTrack = 0x80000000	///< Do not track this allocation.
 };
 
 namespace AK
@@ -108,15 +105,17 @@ namespace AK
 		/// - \ref memorymanager
 		struct GlobalStats
 		{
-			AkUInt64 uUsed;       ///< Total memory used including all categories (in bytes)
-			AkUInt64 uReserved;   ///< Total reserved memory. (Used and unused). Will return 0 if the reserved memory is not traceable.
+			AkUInt64 uUsed;			///< Total memory used including all categories (in bytes)
+			AkUInt64 uDeviceUsed;	///< Total device memory used including all categories (in bytes)
+			AkUInt64 uReserved;		///< Total reserved memory. (Used and unused). Will return 0 if the reserved memory is not traceable.
+			AkUInt64 uMax;			///< Maximum total allocation size, specified in the initialization settings through uMemAllocationSizeLimit. Will be 0 if no limit was set.
 		};
 
 		////////////////////////////////////////////////////////////////////////
 		/// @name Initialization
 		//@{
 
-		/// Query whether the Memory Manager has been successfully initialized.
+		/// Query whether the Memory Manager has been sucessfully initialized.
 		/// \warning This function is not thread-safe. It should not be called at the same time as MemoryMgr::Init or MemoryMgr::Term.
 		/// \return True if the Memory Manager is initialized, False otherwise
 		/// \sa
@@ -155,7 +154,7 @@ namespace AK
 		/// This function is only required for optimization purposes and does not have to be defined.
 		/// Therefore, unlike TermForThread, this is not expected to be called in all scenarios by Wwise.
 		/// It is also recommended to be called by game engine integrations in any worker threads that run Wwise jobs.
-		/// See \ref eventmgrthread_jobmgr_best_practices for more information.
+		/// Refer to \ref eventmgrthread_jobmgr_best_practices for more information.
 		/// \sa
 		/// - AkMemTrimForThread
 		AK_EXTERNAPIFUNC( void, TrimForThread )();

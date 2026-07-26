@@ -21,7 +21,7 @@ under the Apache License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
 OR CONDITIONS OF ANY KIND, either express or implied. See the Apache License for
 the specific language governing permissions and limitations under the License.
 
-  Copyright (c) 2026 Audiokinetic Inc.
+  Copyright (c) 2023 Audiokinetic Inc.
 *******************************************************************************/
 
 // AkSimd.h
@@ -29,11 +29,10 @@ the specific language governing permissions and limitations under the License.
 /// \file 
 /// AKSIMD - SSE implementation
 
-#pragma once
+#ifndef _AK_SIMD_SSE_H_
+#define _AK_SIMD_SSE_H_
 
-#include <AK/SoundEngine/Common/AkSimdTypes.h>
 #include <AK/SoundEngine/Common/AkTypes.h>
-
 #include <xmmintrin.h>
 #include <smmintrin.h>
 #include <emmintrin.h>
@@ -42,11 +41,48 @@ the specific language governing permissions and limitations under the License.
 #endif
 
 ////////////////////////////////////////////////////////////////////////
+/// @name Platform specific defines for prefetching
+//@{
+
+#define AKSIMD_ARCHCACHELINESIZE	(64)				///< Assumed cache line width for architectures on this platform
+#define AKSIMD_ARCHMAXPREFETCHSIZE	(512) 				///< Use this to control how much prefetching maximum is desirable (assuming 8-way cache)		
+/// Cross-platform memory prefetch of effective address assuming non-temporal data
+#define AKSIMD_PREFETCHMEMORY( __offset__, __add__ ) _mm_prefetch(((char *)(__add__))+(__offset__), _MM_HINT_NTA ) 
+
+//@}
+////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////////
 /// @name Platform specific memory size alignment for allocation purposes
 //@{
 #define AKSIMD_ALIGNSIZE( __Size__ ) (((__Size__) + 15) & ~15)
 //@}
 ////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////////
+/// @name AKSIMD types
+//@{
+
+typedef float	AKSIMD_F32;		///< 32-bit float
+typedef __m128	AKSIMD_V4F32;	///< Vector of 4 32-bit floats
+typedef AKSIMD_V4F32 AKSIMD_V4COND;	 ///< Vector of 4 comparison results
+typedef AKSIMD_V4F32 AKSIMD_V4FCOND;	 ///< Vector of 4 comparison results
+
+typedef __m128i	AKSIMD_V4I32;	///< Vector of 4 32-bit signed integers
+
+struct AKSIMD_V4I32X2 {			///< Pair of 4 32-bit signed integers
+	AKSIMD_V4I32 val[2];
+};
+
+struct AKSIMD_V4I32X4 {			///< Quartet of 4 32-bit signed integers
+	AKSIMD_V4I32 val[4];
+};
+
+typedef AKSIMD_V4I32 AKSIMD_V4ICOND;
+
+//@}
+////////////////////////////////////////////////////////////////////////
+
 
 ////////////////////////////////////////////////////////////////////////
 /// @name AKSIMD loading / setting
@@ -208,8 +244,6 @@ static AkForceInline AKSIMD_V4COND AKSIMD_SETMASK_V4COND( AkUInt32 x )
 #define AKSIMD_MSUB_V4F32( __a__, __b__, __c__ ) _mm_sub_ps( _mm_mul_ps( (__a__), (__b__) ), (__c__) )
 #endif
 
-#define AKSIMD_LERP_V4F32( _alpha_, __a__, __b__ ) AKSIMD_MADD_V4F32(_alpha_, AKSIMD_SUB_V4F32(__b__, __a__), __a__)
-
 /// Vector multiply-add operation.
 #define AKSIMD_MADD_SS_V4F32( __a__, __b__, __c__ ) _mm_add_ss( _mm_mul_ss( (__a__), (__b__) ), (__c__) )
 
@@ -242,7 +276,7 @@ static AkForceInline AKSIMD_V4COND AKSIMD_SETMASK_V4COND( AkUInt32 x )
 /// Rounds to upper value
 static AkForceInline AKSIMD_V4F32 AKSIMD_CEIL_V4F32(const AKSIMD_V4F32 & x)
 {
-	const AKSIMD_V4F32 vEpsilon = { 0.49999f, 0.49999f, 0.49999f, 0.49999f };
+	static const AKSIMD_V4F32 vEpsilon = { 0.49999f, 0.49999f, 0.49999f, 0.49999f };
 	return _mm_cvtepi32_ps(_mm_cvtps_epi32(_mm_add_ps(x, vEpsilon)));
 }
 
@@ -268,7 +302,7 @@ static AkForceInline AKSIMD_V4F32 AKSIMD_DOTPRODUCT( AKSIMD_V4F32 & vVec, const 
 /// Cross-platform SIMD multiplication of 2 complex data elements with interleaved real and imaginary parts
 static AkForceInline AKSIMD_V4F32 AKSIMD_COMPLEXMUL_V4F32( const AKSIMD_V4F32 vCIn1, const AKSIMD_V4F32 vCIn2 )
 {
-	const AKSIMD_V4F32 vSign = { -0.f, 0.f, -0.f, 0.f }; 
+	static const AKSIMD_V4F32 vSign = { -0.f, 0.f, -0.f, 0.f }; 
 
 	AKSIMD_V4F32 vTmp1 = AKSIMD_SHUFFLE_V4F32( vCIn1, vCIn1, AKSIMD_SHUFFLE(2,2,0,0));
 	vTmp1 = AKSIMD_MUL_V4F32( vTmp1, vCIn2 );
@@ -469,18 +503,13 @@ static AkForceInline AKSIMD_V4I32X4 AKSIMD_GATHER_V4I64_AND_DEINTERLEAVE_V4I32X4
 
 /// Vector "==" operation (see _mm_cmpeq_ps)
 #define AKSIMD_EQ_V4F32( __a__, __b__ ) _mm_cmpeq_ps( (__a__), (__b__) )
-#define AKSIMD_EQ_V4I32( __a__, __b__ ) _mm_castsi128_ps(_mm_cmpeq_epi32( (__a__), (__b__) ))
 
 /// Return a when control mask is 0, return b when control mask is non zero, control mask is in c and usually provided by above comparison operations
 static AkForceInline AKSIMD_V4F32 AKSIMD_VSEL_V4F32( AKSIMD_V4F32 vA, AKSIMD_V4F32 vB, AKSIMD_V4F32 vMask )
 {
-#if defined(__SSE4_1__)
-	return _mm_blendv_ps(vA, vB, vMask);
-#else
     vB = _mm_and_ps( vB, vMask );
     vA= _mm_andnot_ps( vMask, vA );
     return _mm_or_ps( vA, vB );
-#endif
 }
 
 // (cond1 >= cond2) ? b : a.
@@ -522,8 +551,6 @@ static AkForceInline bool AKSIMD_TESTONES_V4I32(AKSIMD_V4I32 a)
 #define AKSIMD_SETZERO_V4I32() _mm_setzero_si128()
 
 #define AKSIMD_SET_V4I32( __scalar__ ) _mm_set1_epi32( (__scalar__) )
-
-#define AKSIMD_SET_V16I8( __scalar__ ) _mm_set1_epi8( (__scalar__) )
 
 #define AKSIMD_SETV_V4I32( _d, _c, _b, _a ) _mm_set_epi32( (_d), (_c), (_b), (_a) )
 
@@ -726,7 +753,7 @@ static AkForceInline AKSIMD_V4I32 AKSIMD_CONVERT_V4F32_TO_V4F16(AKSIMD_V4F32 vec
 
 typedef __m64	AKSIMD_V2F32;	///< Vector of 2 32-bit floats
 
-#define AKSIMD_SETZERO_V2F32() _mm_setzero_si64()
+#define AKSIMD_SETZERO_V2F32() _mm_setzero_si64();
 
 #define AKSIMD_CMPGT_V2I32( a, b ) _mm_cmpgt_pi16(a,b)
 
@@ -750,18 +777,9 @@ typedef __m64	AKSIMD_V2F32;	///< Vector of 2 32-bit floats
 
 /// Used when ending a block of code that utilizes any MMX construct on x86 code
 /// so that the x87 FPU can be used again
-#define AKSIMD_MMX_EMPTY _mm_empty()
+#define AKSIMD_MMX_EMPTY _mm_empty();
 
 #endif
 
 
-////////////////////////////////////////////////////////////////////////
-/// @name AKSIMD int16 helpers
-//@{
-// AKSIMD helpers for loading int6 wav data
-
-/// Loads 64 bits (4 int16 values) into lower half of 128 bit vector from unaligned
-/// memory (see _mm_loadl_epi64)
-#define AKSIMD_LOAD_V1I64_LO( __addr__ ) _mm_loadl_epi64(reinterpret_cast<const __m128i*>(__addr__) )
-//@}
-////////////////////////////////////////////////////////////////////////
+#endif //_AK_SIMD_SSE_H_

@@ -21,7 +21,7 @@ under the Apache License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
 OR CONDITIONS OF ANY KIND, either express or implied. See the Apache License for
 the specific language governing permissions and limitations under the License.
 
-  Copyright (c) 2026 Audiokinetic Inc.
+  Copyright (c) 2023 Audiokinetic Inc.
 *******************************************************************************/
 
 /**
@@ -377,7 +377,6 @@ namespace AK::Wwise::Plugin
 		using CHostObjectStore = ak_wwise_plugin_host_object_store_v1;
 
 		/// \copydoc ak_wwise_plugin_host_object_store_v1 
-		template<typename PropertySetT = AK::Wwise::Plugin::PropertySet>
 		class ObjectStore : public CBaseInstanceGlue<CHostObjectStore>
 		{
 		public:
@@ -442,7 +441,7 @@ namespace AK::Wwise::Plugin
 			inline void InsertPropertySet(
 				const char * in_pszListName,
 				unsigned int in_uiIndex,
-				const PropertySetT& in_propertySet
+				const PropertySet& in_propertySet
 			)
 			{
 				g_cinterface->InsertPropertySet(this, in_pszListName, in_uiIndex, &in_propertySet);
@@ -468,7 +467,7 @@ namespace AK::Wwise::Plugin
 			 * \return true if successful
 			 */
 			inline bool RemovePropertySet(
-				const PropertySetT& in_propertySet
+				const PropertySet& in_propertySet
 			)
 			{
 				return MKBOOL(g_cinterface->RemovePropertySet(this, &in_propertySet));
@@ -491,12 +490,12 @@ namespace AK::Wwise::Plugin
 			 *            object count in that list, the function will return nullptr.
 			 * \return The requested inner property set, or nullptr if not existing.
 			 */
-			inline PropertySetT* GetPropertySet(
+			inline PropertySet* GetPropertySet(
 				const char * in_pszListName,
 				unsigned int in_uiIndex
 			) const
 			{
-				return static_cast<PropertySetT*>(g_cinterface->GetPropertySet(this, in_pszListName, in_uiIndex));
+				return static_cast<PropertySet*>(g_cinterface->GetPropertySet(this, in_pszListName, in_uiIndex));
 			}
 
 			/**
@@ -533,11 +532,11 @@ namespace AK::Wwise::Plugin
 			 * \param[in] in_pszType The requested InnerType, as defined in the plug-in's XML definition file.
 			 * \return A new inner property set instance.
 			 */
-			inline PropertySetT* CreatePropertySet(
+			inline PropertySet* CreatePropertySet(
 				const char * in_pszType
 			)
 			{
-				return static_cast<PropertySetT*>(g_cinterface->CreatePropertySet(this, in_pszType));
+				return static_cast<PropertySet*>(g_cinterface->CreatePropertySet(this, in_pszType));
 			}
 
 			/**
@@ -556,7 +555,7 @@ namespace AK::Wwise::Plugin
 			 * \param[in] in_pPropertySet The inner property set to permanently delete.
 			 */
 			inline void DeletePropertySet(
-				PropertySetT* in_pPropertySet
+				PropertySet* in_pPropertySet
 			)
 			{
 				g_cinterface->DeletePropertySet(this, in_pPropertySet);
@@ -606,7 +605,6 @@ namespace AK::Wwise::Plugin
 			using CObjectStore_ = ak_wwise_plugin_notifications_object_store_v1;
 
 			/// \copydoc ak_wwise_plugin_notifications_object_store_v1
-			template<typename PropertySetT = AK::Wwise::Plugin::PropertySet>
 			class ObjectStore_ : public CObjectStore_::Instance
 			{
 			public:
@@ -641,7 +639,7 @@ namespace AK::Wwise::Plugin
 				 */
 				struct Interface : public CObjectStore_
 				{
-					using Instance = ObjectStore_<PropertySetT>;
+					using Instance = ObjectStore_;
 					Interface()
 					{
 						CObjectStore_::NotifyInnerObjectPropertyChanged = [](
@@ -651,7 +649,7 @@ namespace AK::Wwise::Plugin
 							const char * in_pszPropertyName)
 						{
 							static_cast<Instance*>(in_this)->NotifyInnerObjectPropertyChanged(
-								*static_cast<PropertySetT*>(in_pPSet),
+								*static_cast<PropertySet*>(in_pPSet),
 								*in_guidPlatform,
 								in_pszPropertyName);
 						};
@@ -662,7 +660,7 @@ namespace AK::Wwise::Plugin
 							NotifyInnerObjectOperation in_eOperation)
 						{
 							static_cast<Instance*>(in_this)->NotifyInnerObjectAddedRemoved(
-								*static_cast<PropertySetT*>(in_pPSet),
+								*static_cast<PropertySet*>(in_pPSet),
 								in_uiIndex,
 								in_eOperation);
 						};
@@ -701,7 +699,7 @@ namespace AK::Wwise::Plugin
 				 * \param[in] in_pszPropertyName The name of the property that changed.
 				 */
 				virtual void NotifyInnerObjectPropertyChanged(
-					PropertySetT& in_PSet,
+					PropertySet& in_PSet,
 					const GUID& in_guidPlatform,
 					const char* in_pszPropertyName
 				) {}
@@ -720,7 +718,7 @@ namespace AK::Wwise::Plugin
 				 * \param[in] in_eOperation InnerObjectAdded or InnerObjectRemoved.
 				 */
 				virtual void NotifyInnerObjectAddedRemoved(
-					PropertySetT& in_PSet,
+					PropertySet& in_PSet,
 					unsigned int in_uiIndex,
 					NotifyInnerObjectOperation in_eOperation
 				) {}
@@ -735,18 +733,14 @@ namespace AK::Wwise::Plugin
 		 * functions, as defined in Notifications::ObjectStore_, and access the host-provided functions in the
 		 * \c m_objectStore variable.
 		 */
-		using RequestObjectStore_PropertySet_v1 = RequestedHostInterface<ObjectStore<AK::Wwise::Plugin::V1::PropertySet>>;
-		using RequestObjectStore_PropertySet_v2 = RequestedHostInterface<ObjectStore<AK::Wwise::Plugin::V2::PropertySet>>;
-		using RequestObjectStore = RequestObjectStore_PropertySet_v2;
+		using RequestObjectStore = RequestedHostInterface<ObjectStore>;
 
 	} // of namespace V1
 
 	/// Latest version of the C ObjectStore interface.
 	using CHostObjectStore = V1::CHostObjectStore;
 	/// Latest version of the C++ ObjectStore interface.
-	using ObjectStore_PropertySet_v1 = V1::ObjectStore<AK::Wwise::Plugin::V1::PropertySet>;
-	using ObjectStore_PropertySet_v2 = V1::ObjectStore<AK::Wwise::Plugin::V2::PropertySet>;
-	using ObjectStore = ObjectStore_PropertySet_v2;
+	using ObjectStore = V1::ObjectStore;
 	/// Latest version of the requested C++ ObjectStore interface.
 	using RequestObjectStore = V1::RequestObjectStore;
 
@@ -755,9 +749,7 @@ namespace AK::Wwise::Plugin
 		/// Latest version of the C ObjectStore notification interface.
 		using CObjectStore = V1::Notifications::CObjectStore_;
 		/// Latest version of the C++ ObjectStore notification interface.
-		using ObjectStore_PropertySet_v1 = V1::Notifications::ObjectStore_<AK::Wwise::Plugin::V1::PropertySet>;
-		using ObjectStore_PropertySet_v2 = V1::Notifications::ObjectStore_<AK::Wwise::Plugin::V2::PropertySet>;
-		using ObjectStore = ObjectStore_PropertySet_v2;
+		using ObjectStore = V1::Notifications::ObjectStore_;
 	}
 
 	AK_WWISE_PLUGIN_SPECIALIZE_HOST_INTERFACE(ObjectStore, objectStore,, public Notifications::ObjectStore);

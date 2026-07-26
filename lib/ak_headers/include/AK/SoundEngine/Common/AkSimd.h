@@ -21,7 +21,7 @@ under the Apache License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
 OR CONDITIONS OF ANY KIND, either express or implied. See the Apache License for
 the specific language governing permissions and limitations under the License.
 
-  Copyright (c) 2026 Audiokinetic Inc.
+  Copyright (c) 2023 Audiokinetic Inc.
 *******************************************************************************/
 
 // AkSimd.h
@@ -29,7 +29,8 @@ the specific language governing permissions and limitations under the License.
 /// \file 
 /// Simd definitions.
 
-#pragma once
+#ifndef _AK_SIMD_H_
+#define _AK_SIMD_H_
 
 #include <AK/SoundEngine/Common/AkTypes.h>
 
@@ -43,14 +44,50 @@ the specific language governing permissions and limitations under the License.
 //////////////////////////////////////////////////////////////////////////
 // Platform-specific section.
 
-#if defined AK_CPU_X86 || defined AK_CPU_X86_64 || defined AK_CPU_WASM
-	#include <AK/SoundEngine/Platforms/SSE/AkSimd.h>
-#elif defined AK_CPU_ARM_NEON
-	#include <AK/SoundEngine/Platforms/arm_neon/AkSimd.h>
-#else
-	#include <AK/SoundEngine/Platforms/Generic/AkSimd.h>
-#endif
+#if defined( AK_WIN ) || defined( AK_XBOX )
+	
+	#include <AK/SoundEngine/Platforms/Windows/AkSimd.h>
 
+#elif defined( AK_APPLE )
+
+	#include <TargetConditionals.h>
+	#if TARGET_OS_IPHONE
+		#include <AK/SoundEngine/Platforms/iOS/AkSimd.h>
+	#else
+		#include <AK/SoundEngine/Platforms/Mac/AkSimd.h>
+	#endif
+
+#elif defined( AK_ANDROID )
+
+	#include <AK/SoundEngine/Platforms/Android/AkSimd.h>
+
+#elif defined( AK_PS4 )
+
+	#include <AK/SoundEngine/Platforms/PS4/AkSimd.h>
+	
+#elif defined( AK_PS5 )
+
+	#include <AK/SoundEngine/Platforms/PS5/AkSimd.h>
+
+#elif defined( AK_LINUX )
+
+	#include <AK/SoundEngine/Platforms/Linux/AkSimd.h>
+
+#elif defined( AK_EMSCRIPTEN )
+
+	#include <AK/SoundEngine/Platforms/Emscripten/AkSimd.h>
+
+#elif defined( AK_QNX )
+
+	#include <AK/SoundEngine/Platforms/QNX/AkSimd.h>
+
+#elif defined( AK_NX )
+
+	#include <AK/SoundEngine/Platforms/NX/AkSimd.h>
+
+#else
+	#error Unsupported platform, or platform-specific SIMD not defined
+#endif
 
 //////////////////////////////////////////////////////////////////////////
 // Other helpers
@@ -59,27 +96,25 @@ the specific language governing permissions and limitations under the License.
 	#define AKSIMD_ASSERTFLUSHZEROMODE
 #endif
 
-// Helper macros and structs to declare vectors in an order that matches memory layout
-struct AKSIMD_DECLARE_V4F32_TYPE
-{
-	AK_ALIGN_SIMD(AkReal32 f[4]);
-	inline operator const AkReal32* () const noexcept { return f; }
-	inline operator AKSIMD_V4F32() const noexcept { return AKSIMD_LOAD_V4F32(f); }
-};
-struct AKSIMD_DECLARE_V4I32_TYPE
-{
-	AK_ALIGN_SIMD(AkInt32 i[4]);
-	inline operator const AkInt32* () const noexcept { return i; }
-	inline operator AKSIMD_V4I32() const noexcept { return AKSIMD_LOAD_V4I32((AKSIMD_V4I32*)i); }
-};
-#define AKSIMD_SETVR_V2F64( _a, _b )         AKSIMD_SETV_V2F64( (_b), (_a) )
-#define AKSIMD_SETVR_V4F32( _a, _b, _c, _d ) AKSIMD_SETV_V4F32( (_d), (_c), (_b), (_a) )
-#define AKSIMD_SETVR_V2I64( _a, _b)          AKSIMD_SETV_V2I64( (_b), (_a) )
-#define AKSIMD_SETVR_V4I32( _a, _b, _c, _d ) AKSIMD_SETV_V4I32( (_d), (_c), (_b), (_a) )
-#define AKSIMD_DECLARE_V4F32( _x, _a, _b, _c, _d ) AKSIMD_DECLARE_V4F32_TYPE _x = { _a, _b, _c, _d };
-#define AKSIMD_DECLARE_V4I32( _x, _a, _b, _c, _d ) AKSIMD_DECLARE_V4I32_TYPE _x = { _a, _b, _c, _d };
+#ifndef AKSIMD_DECLARE_V4F32_TYPE
+	#define AKSIMD_DECLARE_V4F32_TYPE AKSIMD_V4F32
+#endif
 
-#define AKSIMD_SETELEMENT_V4F32( __vName__, __num__, __value__ ) ( AKSIMD_GETELEMENT_V4F32( __vName__, __num__ ) = (__value__) )
+#ifndef AKSIMD_DECLARE_V4I32_TYPE
+	#define AKSIMD_DECLARE_V4I32_TYPE AKSIMD_V4I32
+#endif
+
+#ifndef AKSIMD_DECLARE_V4F32
+	#define AKSIMD_DECLARE_V4F32( _x, _a, _b, _c, _d ) AKSIMD_DECLARE_V4F32_TYPE _x = { _a, _b, _c, _d }
+#endif
+
+#ifndef AKSIMD_DECLARE_V4I32
+	#define AKSIMD_DECLARE_V4I32( _x, _a, _b, _c, _d ) AKSIMD_DECLARE_V4I32_TYPE _x = { _a, _b, _c, _d }
+#endif
+
+#ifndef AKSIMD_SETELEMENT_V4F32
+	#define AKSIMD_SETELEMENT_V4F32( __vName__, __num__, __value__ ) ( AKSIMD_GETELEMENT_V4F32( __vName__, __num__ ) = (__value__) )
+#endif
 
 /// Rotate four vectors. After rotation:
 ///  A[3:0] = D[0] C[0] B[0] A[0]
@@ -100,3 +135,4 @@ AkForceInline void AKSIMD_TRANSPOSE4X4_V4F32(AKSIMD_V4F32 &A, AKSIMD_V4F32 &B, A
 	D = AKSIMD_SHUFFLE_V4F32(tmp2, tmp4, AKSIMD_SHUFFLE(3, 1, 3, 1));
 }
 
+#endif  //_AK_DATA_TYPES_H_

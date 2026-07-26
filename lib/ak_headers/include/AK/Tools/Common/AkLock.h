@@ -21,7 +21,7 @@ under the Apache License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
 OR CONDITIONS OF ANY KIND, either express or implied. See the Apache License for
 the specific language governing permissions and limitations under the License.
 
-  Copyright (c) 2026 Audiokinetic Inc.
+  Copyright (c) 2023 Audiokinetic Inc.
 *******************************************************************************/
 
 // AkLock.h
@@ -34,36 +34,13 @@ the specific language governing permissions and limitations under the License.
 
 #include <AK/AkPlatforms.h>
 
-#if defined(AK_NULL_PLATFORM)
-// null platform can just rely on std::mutex for locking
-#include <mutex>
-class CAkLock
-{
-public:
-    inline AKRESULT Lock(void)
-    {
-        m_lock.lock();
-        return AK_Success;
-    }
-    inline AKRESULT Unlock(void)
-    {
-        m_lock.unlock();
-        return AK_Success;
-    }
-private:
-    std::mutex m_lock;
-};
-
-#elif defined(AK_WIN) || defined(AK_XBOX)
+#if defined(AK_WIN) || defined(AK_XBOX)
 #include <AK/Tools/Win32/AkLock.h>
 
 #elif defined (AK_APPLE) 
 #include <AK/Tools/POSIX/AkLock.h>
 
 #elif defined (AK_ANDROID)
-#include <AK/Tools/POSIX/AkLock.h>
-
-#elif defined (AK_HARMONY)
 #include <AK/Tools/POSIX/AkLock.h>
 
 #elif defined (AK_PS4)
@@ -83,9 +60,6 @@ private:
 
 #elif defined (AK_NX)
 #include <AK/Tools/NX/AkLock.h>
-
-#elif defined (AK_OUNCE)
-#include <AK/Tools/Ounce/AkLock.h>
 
 #else
 #error AkLock.h: Undefined platform

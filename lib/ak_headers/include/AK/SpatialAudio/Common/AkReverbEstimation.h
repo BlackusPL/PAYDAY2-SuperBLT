@@ -21,7 +21,7 @@ under the Apache License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
 OR CONDITIONS OF ANY KIND, either express or implied. See the Apache License for
 the specific language governing permissions and limitations under the License.
 
-  Copyright (c) 2026 Audiokinetic Inc.
+  Copyright (c) 2023 Audiokinetic Inc.
 *******************************************************************************/
 
 /// \file 
@@ -51,7 +51,7 @@ namespace ReverbEstimation
 	{
 		// constants for the mean and standard deviation of the acoustic texture indices 0,1,2,3
 		const float meanX = 1.5f;
-		const float sdX = 1.11803399f;
+		const float sdX = 1.11803399;
 
 		const int N = 4;
 		float meanY = (texture.fAbsorptionLow + texture.fAbsorptionMidLow + texture.fAbsorptionMidHigh + texture.fAbsorptionHigh) / (float)N;
@@ -153,23 +153,25 @@ namespace ReverbEstimation
 	}
 
 	/// Estimate the high frequency damping from a collection of AkAcousticTextures and corresponding surface areas. 
-	/// The high frequency damping is a measure of how much high frequencies are dampened compared to low frequencies. 
-	/// The value is comprised between -1 and 1. A value > 0 indicates more high frequency damping than low frequency damping. < 0 indicates more low frequency damping than high frequency damping. 0 indicates uniform damping.
+	/// The high frequency damping is a measure of how much high frequencies are dampened compared to low frequencies. > 0 indicates more high frequency damping than low frequency damping. < 0 indicates more low frequency damping than high frequency damping. 0 indicates uniform damping.
 	/// The average absorption values are calculated using each of the textures in the collection, weighted by their corresponding surface area.
 	/// The HFDamping is then calculated as the line-of-best-fit through the average absorption values.
-	AK_EXTERNAPIFUNC(AkReal32, EstimateHFDamping)(
+	AK_EXTERNAPIFUNC(AKRESULT, EstimateHFDamping)(
 		AkAcousticTexture* in_textures,	///< A collection of AkAcousticTexture structs from which to calculate the average high frequency damping.
 		float* in_surfaceAreas,			///< Surface area values for each of the textures in in_textures.
-		int in_numTextures				///< The number of textures in in_textures (and the number of surface area values in in_surfaceAreas).
+		int in_numTextures,				///< The number of textures in in_textures (and the number of surface area values in in_surfaceAreas).
+		AkReal32& out_hfDamping			///< Returns the high frequency damping value. > 0 indicates more high frequency damping than low frequency damping. < 0 indicates more low frequency damping than high frequency damping. 0 indicates uniform damping.
 		)
 	{
 		if (in_textures == nullptr || in_surfaceAreas == nullptr || in_numTextures == 0)
 		{
-			return 0.0f;
+			out_hfDamping = 0.0f;
+			return AK_Success;
 		}
 		AkAcousticTexture averageAbsorptionValues;
 		GetAverageAbsorptionValues(in_textures, in_surfaceAreas, in_numTextures, averageAbsorptionValues);
-		return CalculateSlope(averageAbsorptionValues) * 2.f; // Multiply by 2 so that the Hf Damping value is between -1 and 1.
+		out_hfDamping = CalculateSlope(averageAbsorptionValues);
+		return AK_Success;
 	}
 
 	//@}

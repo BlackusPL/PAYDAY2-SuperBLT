@@ -5,15 +5,15 @@ released in source code form as part of the SDK installer package.
 Commercial License Usage
 
 Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use this file in accordance with the end user license agreement provided
+may use this file in accordance with the end user license agreement provided 
 with the software or, alternatively, in accordance with the terms contained in a
 written agreement between you and Audiokinetic Inc.
 
 Apache License Usage
 
-Alternatively, this file may be used under the Apache License, Version 2.0 (the
-"Apache License"); you may not use this file except in compliance with the
-Apache License. You may obtain a copy of the Apache License at
+Alternatively, this file may be used under the Apache License, Version 2.0 (the 
+"Apache License"); you may not use this file except in compliance with the 
+Apache License. You may obtain a copy of the Apache License at 
 http://www.apache.org/licenses/LICENSE-2.0.
 
 Unless required by applicable law or agreed to in writing, software distributed
@@ -21,12 +21,11 @@ under the Apache License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
 OR CONDITIONS OF ANY KIND, either express or implied. See the Apache License for
 the specific language governing permissions and limitations under the License.
 
-  Copyright (c) 2026 Audiokinetic Inc.
+  Copyright (c) 2023 Audiokinetic Inc.
 *******************************************************************************/
 
 #pragma once
 
-#include <AK/SoundEngine/Common/AkAtomic.h>
 #include <AK/SoundEngine/Common/AkTypes.h>
 #include <AK/Tools/Common/AkObject.h>
 #include <AK/Tools/Common/AkPlatformFuncs.h>
@@ -63,213 +62,166 @@ typedef AkRingBufferAllocatorNoAlign<AkMemID_Object> AkRingBufferAllocatorDefaul
 typedef AkRingBufferAllocatorNoAlign<AkMemID_Processing> AkRingBufferAllocatorLEngine;
 typedef AkRingBufferAllocatorAligned<AkMemID_Processing> AkRingBufferAllocatorLEngineAligned;
 
-//Single producer, single consumer pattern implementation.
 template <class T, class TAlloc = AkRingBufferAllocatorDefault>
+
+//Single producer, single consumer pattern implementation.
 class AkRingBuffer
 {
 public:
-	AkRingBuffer()
-		: m_nbItems(0)
-		, m_readIndex(0)
-		, m_writeIndex(0)
-		, m_nbReadableItems(0)
-	{
-	}
+    AkRingBuffer()
+        : m_nbItems(0)
+        , m_readIndex(0)
+        , m_writeIndex(0)
+        , m_nbReadableItems(0)
+    {
+    }
 
-	AKRESULT Init(AkUInt32 nbItems)
-	{
-		m_nbItems = nbItems;
-		m_readIndex = 0;
-		m_writeIndex = 0;
-		m_nbReadableItems = 0;
+    AKRESULT Init(AkUInt32 nbItems)
+    {
+        m_nbItems = nbItems;
+        m_readIndex = 0;
+        m_writeIndex = 0;
+        m_nbReadableItems = 0;
 
-		m_data = reinterpret_cast<T*>(TAlloc::Alloc(m_nbItems * sizeof(T)));
-		if (m_data == NULL)
-		{
-			return AK_InsufficientMemory;
-		}
-		return AK_Success;
-	}
+        m_data = reinterpret_cast<T*>(TAlloc::Alloc(m_nbItems * sizeof(T)));
+        if (m_data == NULL)
+        {
+            return AK_InsufficientMemory;
+        }
+        return AK_Success;
+    }
 
-	void Term()
-	{
-		m_nbItems = 0;
-		m_readIndex = 0;
-		m_writeIndex = 0;
-		m_nbReadableItems = 0;
+    void Term()
+    {
+        m_nbItems = 0;
+        m_readIndex = 0;
+        m_writeIndex = 0;
+        m_nbReadableItems = 0;
+        
+        if (m_data != NULL)
+        {
+            TAlloc::Free(reinterpret_cast<void*>(m_data));
+            m_data = NULL;
+        }
+    }
 
-		if (m_data != NULL)
-		{
-			TAlloc::Free(reinterpret_cast<void*>(m_data));
-			m_data = NULL;
-		}
-	}
+    // Reset ringbuffer to initial state without freeing memory. Not thread-safe.
+    void Reset()
+    {
+        m_readIndex = 0;
+        m_writeIndex = 0;
+        m_nbReadableItems = 0;
+    }
 
-	// Reset ringbuffer to initial state without freeing memory. Not thread-safe.
-	void Reset()
-	{
-		m_readIndex = 0;
-		m_writeIndex = 0;
-		m_nbReadableItems = 0;
-	}
+    // ---- Producer ---- //
 
-	// ---- Producer ---- //
+    AkUInt32 GetWriteIndex() const
+    {
+        return m_writeIndex;
+    }
+    
+    T* GetWritePtr()
+    {
+        return &m_data[m_writeIndex];
+    }
 
-	AkUInt32 GetWriteIndex() const
-	{
-		return m_writeIndex;
-	}
+    void IncrementWriteIndex(AkUInt32 nbItems)
+    {
+        AKASSERT(GetNbWritableItems() >= nbItems);
 
-	T* GetWritePtr()
-	{
-		return &m_data[m_writeIndex];
-	}
+        m_writeIndex = (m_writeIndex + nbItems) % m_nbItems;
 
-	void IncrementWriteIndex(AkUInt32 nbItems)
-	{
-		AKASSERT(GetNbWritableItems() >= nbItems);
+        AkAtomicAdd32(&m_nbReadableItems, nbItems);
+    }
 
-		m_writeIndex = (m_writeIndex + nbItems) % m_nbItems;
+    // ---- Consumer ----
 
-		AkAtomicAdd32(&m_nbReadableItems, nbItems);
-	}
+    AkUInt32 GetReadIndex() const
+    {
+        return m_readIndex;
+    }
 
-	void WriteDataToRing(T* in_pSrc, AkUInt32 in_nbItems)
-	{
-		AKASSERT(GetNbWritableItems() >= in_nbItems);
-		AKASSERT(in_nbItems <= m_nbItems);
+    const T* GetReadPtr() const
+    {
+        return &m_data[m_readIndex];
+    }
 
-		// no wrapping
-		if (m_writeIndex + in_nbItems <= m_nbItems)
-		{
-			AKPLATFORM::AkMemCpy(m_data + m_writeIndex, in_pSrc, in_nbItems * sizeof(T));
-		}
-		else // wrapping past end (split memcpy)
-		{
-			AkUInt32 uItemsBeforeWrap = m_nbItems - m_writeIndex;
-			AkUInt32 uItemsAfterWrap = in_nbItems - uItemsBeforeWrap;
-			AKPLATFORM::AkMemCpy(m_data + m_writeIndex, in_pSrc, uItemsBeforeWrap * sizeof(T));
-			AKPLATFORM::AkMemCpy(m_data, in_pSrc + uItemsBeforeWrap, uItemsAfterWrap * sizeof(T));
+    // Peek at any item between the read and write pointer without advancing the read pointer.
+    const T* Peek(AkUInt32 uOffset) const
+    {
+        AKASSERT((AkUInt32)m_nbReadableItems > uOffset);
+        AkUInt32 uReadIndex = (m_readIndex + uOffset) % m_nbItems;
+        return &m_data[uReadIndex];
+    }
 
-		}
-		m_writeIndex = (m_writeIndex + in_nbItems);
-		m_writeIndex -= m_writeIndex >= m_nbItems ? m_nbItems : 0;
+    void IncrementReadIndex(AkUInt32 nbItems)
+    {
+        AKASSERT((AkUInt32)m_nbReadableItems >= nbItems);
+        
+        m_readIndex = (m_readIndex + nbItems) % m_nbItems;
 
-		AkAtomicAdd32(&m_nbReadableItems, in_nbItems);
-	}
+        AkAtomicSub32(&m_nbReadableItems, nbItems);
+    }
 
-	// ---- Consumer ----
+    AkUInt32 GetNbReadableItems() const
+    {
+        return m_nbReadableItems;
+    }
 
-	AkUInt32 GetReadIndex() const
-	{
-		return m_readIndex;
-	}
+    AkUInt32 GetNbWritableItems() const
+    {
+        return m_nbItems - (AkUInt32)m_nbReadableItems;
+    }
 
-	const T* GetReadPtr() const
-	{
-		return &m_data[m_readIndex];
-	}
+    AkUInt32 Size() const
+    {
+        return m_nbItems;
+    }
 
-	// Peek at any item between the read and write pointer without advancing the read pointer.
-	const T* Peek(AkUInt32 uOffset) const
-	{
-		AKASSERT(GetNbReadableItems() > uOffset);
-		AkUInt32 uReadIndex = (m_readIndex + uOffset) % m_nbItems;
-		return &m_data[uReadIndex];
-	}
+    // Warning: requires external locking to prevent concurrent Grow+Read in a multi-threaded scenario. 
+    // Like the rest of the class, assumes a single writing thread.
+    bool Grow(AkUInt32 in_uGrowBy)
+    {
+        AkUInt32 uTargetItems = m_nbItems + in_uGrowBy;
+        if (T* pNewData = reinterpret_cast<T*>(TAlloc::Alloc(uTargetItems * sizeof(T))))
+        {
+            if (m_nbReadableItems)
+            {
+                if (m_readIndex >= m_writeIndex)
+                {
+                    // insert new free space in the middle of the buffer.
 
-	void IncrementReadIndex(AkUInt32 nbItems)
-	{
-		AKASSERT(GetNbReadableItems() >= nbItems);
+                    if (m_writeIndex)
+                        memcpy(pNewData, m_data, sizeof(T) * m_writeIndex);
 
-		m_readIndex = (m_readIndex + nbItems) % m_nbItems;
+                    memcpy(pNewData + m_readIndex + in_uGrowBy, m_data + m_readIndex, sizeof(T) * (m_nbItems - m_readIndex));
+                    m_readIndex += in_uGrowBy;
+                }
+                else
+                {
+                    // insert new free space at the end of the buffer.
 
-		AkAtomicSub32(&m_nbReadableItems, nbItems);
-	}
+                    memcpy(pNewData + m_readIndex, m_data + m_readIndex, sizeof(T) * (AkUInt32)m_nbReadableItems);
+                }
+            }
 
-	AkUInt32 GetNbReadableItems() const
-	{
-		return (AkUInt32)AkAtomicLoad32(const_cast<AkAtomic32*>(&m_nbReadableItems));
-	}
+            TAlloc::Free(reinterpret_cast<void*>(m_data));
+            m_data = pNewData;
+            m_nbItems = uTargetItems;
 
-	AkUInt32 GetNbWritableItems() const
-	{
-		return m_nbItems - GetNbReadableItems();
-	}
-
-	AkUInt32 Size() const
-	{
-		return m_nbItems;
-	}
-
-	void ReadDataFromRing(T* in_pSrc, AkUInt32 in_nbItems)
-	{
-		AKASSERT(GetNbReadableItems() >= in_nbItems);
-		AKASSERT(in_nbItems <= m_nbItems);
-
-		// no wrapping
-		if (m_readIndex + in_nbItems <= m_nbItems)
-		{
-			AKPLATFORM::AkMemCpy(in_pSrc, m_data + m_readIndex, in_nbItems * sizeof(T));
-		}
-		else // wrapping past end (split memcpy)
-		{
-			AkUInt32 uItemsBeforeWrap = m_nbItems - m_readIndex;
-			AkUInt32 uItemsAfterWrap = in_nbItems - uItemsBeforeWrap;
-			AKPLATFORM::AkMemCpy(in_pSrc, m_data + m_readIndex, uItemsBeforeWrap * sizeof(T));
-			AKPLATFORM::AkMemCpy(in_pSrc + uItemsBeforeWrap, m_data, uItemsAfterWrap * sizeof(T));
-		}
-		m_readIndex = (m_readIndex + in_nbItems);
-		m_readIndex -= m_readIndex >= m_nbItems ? m_nbItems : 0;
-
-		AkAtomicSub32(&m_nbReadableItems, in_nbItems);
-	}
-
-	// Warning: requires external locking to prevent concurrent Grow+Read in a multi-threaded scenario. 
-	// Like the rest of the class, assumes a single writing thread.
-	bool Grow(AkUInt32 in_uGrowBy)
-	{
-		AkUInt32 uTargetItems = m_nbItems + in_uGrowBy;
-		if (T* pNewData = reinterpret_cast<T*>(TAlloc::Alloc(uTargetItems * sizeof(T))))
-		{
-			AkUInt32 uReadableItems = GetNbReadableItems();
-			if (uReadableItems)
-			{
-				if (m_readIndex >= m_writeIndex)
-				{
-					// insert new free space in the middle of the buffer.
-
-					if (m_writeIndex)
-						AKPLATFORM::AkMemCpy(pNewData, m_data, sizeof(T) * m_writeIndex);
-
-					AKPLATFORM::AkMemCpy(pNewData + m_readIndex + in_uGrowBy, m_data + m_readIndex, sizeof(T) * (m_nbItems - m_readIndex));
-					m_readIndex += in_uGrowBy;
-				}
-				else
-				{
-					// insert new free space at the end of the buffer.
-
-					AKPLATFORM::AkMemCpy(pNewData + m_readIndex, m_data + m_readIndex, sizeof(T) * uReadableItems);
-				}
-			}
-
-			TAlloc::Free(reinterpret_cast<void*>(m_data));
-			m_data = pNewData;
-			m_nbItems = uTargetItems;
-
-			return true;
-		}
-		else
-		{
-			return false;
-		}
-	}
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
 
 private:
-	T* m_data{ nullptr };
+    T* m_data{nullptr};
 
-	AkUInt32 m_nbItems;
-	AkUInt32 m_readIndex;
-	AkUInt32 m_writeIndex;
-	AkAtomic32 m_nbReadableItems;
+    AkUInt32 m_nbItems;
+    AkUInt32 m_readIndex;
+    AkUInt32 m_writeIndex;
+    AkAtomic32 m_nbReadableItems;
 };
