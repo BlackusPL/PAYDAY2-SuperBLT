@@ -21,15 +21,15 @@ under the Apache License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
 OR CONDITIONS OF ANY KIND, either express or implied. See the Apache License for
 the specific language governing permissions and limitations under the License.
 
-  Copyright (c) 2026 Audiokinetic Inc.
+  Copyright (c) 2023 Audiokinetic Inc.
 *******************************************************************************/
 
 #ifndef _AKBLOCKPOOL_H
 #define _AKBLOCKPOOL_H
 
+#include <AK/Tools/Common/AkObject.h>
 #include <AK/Tools/Common/AkAssert.h>
 #include <AK/Tools/Common/AkListBareLight.h>
-#include <AK/Tools/Common/AkPlacementNew.h>
 
 //
 //  AkDynaBlkPool	- A dynamic block pool allocator which will grow (and shrink) in size in contiguous chunks of 'uPoolChunkSize' objects.
@@ -98,10 +98,6 @@ class AkDynaBlkPool: public TAlloc
 	typedef AkListBareLight< PoolChunk > tChunkList;
 
 public:
-	~AkDynaBlkPool()
-	{
-		AKASSERT(m_chunkList.IsEmpty());
-	}
 
 	T* New()
 	{
@@ -148,23 +144,6 @@ public:
 		Free(ptr);
 	}
 
-	void Transfer(AkDynaBlkPool<T, uPoolChunkSize, TAlloc>& in_src)
-	{
-		m_chunkList.Transfer(in_src.m_chunkList);
-
-#ifdef AK_DYNA_BLK_STATS
-		uPeakUsedBytes = in_src.uPeakUsedBytes;
-		uPeakAllocdBytes = in_src.uPeakAllocdBytes;
-		uCurrentAllocdBytes = in_src.uCurrentAllocdBytes;
-		uCurrentUsedBytes = in_src.uCurrentUsedBytes;
-
-		in_src.uPeakUsedBytes = 0;
-		in_src.uPeakAllocdBytes = 0;
-		in_src.uCurrentAllocdBytes = 0;
-		in_src.uCurrentUsedBytes = 0;
-#endif
-	}
-
 private:
 	T* Alloc()
 	{
@@ -178,12 +157,10 @@ private:
 		if (pChunk == NULL)
 		{
 			pChunk = (PoolChunk *) TAlloc::Alloc( sizeof( PoolChunk ) );
-			if (pChunk)
-			{
-				AkPlacementNew(pChunk) PoolChunk();
-				STATS_NEWCHUNK();
+			AkPlacementNew(pChunk) PoolChunk();
+			STATS_NEWCHUNK();
+			if (pChunk != NULL)
 				m_chunkList.AddFirst(pChunk);
-			}
 		}
 
 		if (pChunk != NULL)

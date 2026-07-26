@@ -21,7 +21,7 @@ under the Apache License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
 OR CONDITIONS OF ANY KIND, either express or implied. See the Apache License for
 the specific language governing permissions and limitations under the License.
 
-  Copyright (c) 2026 Audiokinetic Inc.
+  Copyright (c) 2023 Audiokinetic Inc.
 *******************************************************************************/
 
 // AkTypes.h
@@ -35,77 +35,70 @@ the specific language governing permissions and limitations under the License.
 
 #include <limits.h>
 
-#if !defined(AK_WIN )
-	#define AK_WIN ///< Compiling for Windows
+#ifndef __cplusplus
+	#include <wchar.h> // wchar_t not a built-in type in C
 #endif
 
+#define AK_WIN										///< Compiling for Windows
+
 #if defined _M_IX86
-	#define AK_CPU_X86 ///< Compiling for 32-bit x86 CPU
-	#if !defined(_X86_) // normally defined in windows.h; defining here so we can rely on windef.h and other minimal use of windows headers
-		#define _X86_
-	#endif	
-
+	#define AK_CPU_X86								///< Compiling for 32-bit x86 CPU
 #elif defined _M_AMD64
-	#define AK_CPU_X86_64 ///< Compiling for 64-bit x86 CPU
-	#if !defined(_AMD64_) // normally defined in windows.h; defining here so we can rely on windef.h and other minimal use of windows headers
-		#define _AMD64_
-	#endif	
-
+	#define AK_CPU_X86_64							///< Compiling for 64-bit x86 CPU
 #elif defined _M_ARM
 	#define AK_CPU_ARM
 	#define AK_CPU_ARM_NEON
-	#if !defined(_ARM_)
-		#define _ARM_
-	#endif
-
 #elif defined _M_ARM64
 	#define AK_CPU_ARM_64
 	#define AK_CPU_ARM_NEON
-	#if !defined(_ARM64_)
-		#define _ARM64_
-	#endif
-
 #endif
 
-#ifdef NTDDI_VERSION
-#ifdef AUDIOKINETIC
-#error NTDDI_VERSION must be defined by AkTypes.h in Audiokinetic modules
-#endif // AUDIOKINETIC
-#else
-#define NTDDI_VERSION 0x06020000	// NTDDI_WIN8
-#endif // NTDDI_VERSION
+#ifdef WINAPI_FAMILY
+	#include <winapifamily.h>
+	#if !WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
+		#define AK_USE_UWP_API
+		#define AK_USE_METRO_API // deprecated
+		#ifdef __cplusplus_winrt
+			#define AK_UWP_CPP_CX // To test for UWP code which uses Microsoft's C++/CX extended language (not all projects do)
+		#endif
+		#if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_PC_APP)
+			#define AK_WIN_UNIVERSAL_APP
+		#endif
+	#endif
+#endif
 
-#include <sdkddkver.h>
+#ifndef _WIN32_WINNT
+	#ifdef AK_WIN_UNIVERSAL_APP
+		#define _WIN32_WINNT 0x0A00 // _WIN32_WINNT_WIN10
+	#else
+		#define _WIN32_WINNT 0x0602
+	#endif
+#endif
 
 #define AK_71FROMSTEREOMIXER
 #define AK_51FROMSTEREOMIXER
 
-#ifndef MSTC_SYSTEMATIC_MEMORY_STRESS
 #define AK_SUPPORT_THREADS
-#endif
-
 #define AK_SUPPORT_WCHAR						///< Can support wchar
-#ifndef __cplusplus
-	#include <wchar.h> // wchar_t not a built-in type in C
-#endif
 #define AK_OS_WCHAR								///< Use wchar natively
 
 #define AK_SUPPORT_THREAD_LOCAL					///< Support thread_local C++11 keyword with no restrictions
 
 #define AK_RESTRICT		__restrict				///< Refers to the __restrict compilation flag available on some platforms
-#if  (_MSVC_LANG >= 202002L)
-#define AK_EXPECT_FALSE( _x )	(_x) [[unlikely]]
-#else
 #define AK_EXPECT_FALSE( _x )	(_x)
-#endif
 #define AkForceInline	__forceinline			///< Force inlining
 #define AkNoInline		__declspec(noinline)	///< Disable inlining
 
 #define AK_SIMD_ALIGNMENT	16					///< Platform-specific alignment requirement for SIMD data
 #define AK_ALIGN_SIMD( _declaration_ )	AK_ALIGN( _declaration_, AK_SIMD_ALIGNMENT )	///< Platform-specific alignment requirement for SIMD data
 #define AK_BUFFER_ALIGNMENT AK_SIMD_ALIGNMENT
+#define AK_XAUDIO2_FLAGS 0
 
+#ifdef AK_USE_UWP_API
+#define AK_WINRT_DEVICENOTIFICATION
+#else
 #define AK_DEVICE_CACHE_SUPPORT					///< Supports output device notifications & cache
+#endif
 
 #if defined AK_CPU_X86 || defined AK_CPU_X86_64 || defined AK_CPU_ARM_NEON
 #define AKSIMD_V4F32_SUPPORTED
@@ -157,7 +150,7 @@ typedef AkUInt32			AkFourcc;			///< Riff chunk
 /// \remark Usage: AKPLATFORM::OutputDebugMsgV(AKTEXT("Print this string: " AK_OSCHAR_FMT "\n", msg));
 #define AK_OSCHAR_FMT "%ls"
 
-/// Macro that takes a string literal and changes it to an AkOSChar string at compile time
+/// Macro that takes a string litteral and changes it to an AkOSChar string at compile time
 /// \remark This is similar to the TEXT() and _T() macros that can be used to turn string litterals into wchar_t strings
 /// \remark Usage: AKTEXT( "Some Text" )
 #define AKTEXT(x) L ## x

@@ -21,19 +21,16 @@ under the Apache License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
 OR CONDITIONS OF ANY KIND, either express or implied. See the Apache License for
 the specific language governing permissions and limitations under the License.
 
-  Copyright (c) 2026 Audiokinetic Inc.
+  Copyright (c) 2023 Audiokinetic Inc.
 *******************************************************************************/
 
 #ifndef _AK_PLATFORM_FUNCS_H_
 #define _AK_PLATFORM_FUNCS_H_
 
-#if !defined(WIN32_LEAN_AND_MEAN)
-#define WIN32_LEAN_AND_MEAN
-#endif
-#include <windows.h>
-#include <malloc.h>
-
+#include "malloc.h"
 #include <AK/Tools/Common/AkAssert.h>
+#include <AK/SoundEngine/Common/AkAtomic.h>
+#include <windows.h>
 #include <stdio.h>
 
 #if defined(_WIN64)
@@ -43,13 +40,21 @@ the specific language governing permissions and limitations under the License.
 #endif // _WIN64
 #include <intrin.h>
 
+#if defined(AK_XBOXSERIESX)
+#include <ammintrin.h>
+#endif
+
 //-----------------------------------------------------------------------------
 // Platform-specific thread properties definition.
 //-----------------------------------------------------------------------------
 struct AkThreadProperties
 {
     int                 nPriority;		///< Thread priority
+#ifdef AK_WIN_UNIVERSAL_APP
+	PROCESSOR_NUMBER    processorNumber;///< Ideal processor (passed to SetThreadIdealProcessorEx)
+#else
 	AkUInt32            dwAffinityMask;	///< Affinity mask
+#endif
 	AkUInt32			uStackSize;		///< Thread stack size.
 };
 
@@ -84,6 +89,10 @@ namespace AK
 
 #define AK_INFINITE                             INFINITE
 
+#define AkMax(x1, x2)	(((x1) > (x2))? (x1): (x2))
+#define AkMin(x1, x2)	(((x1) < (x2))? (x1): (x2))
+#define AkClamp(x, min, max)  ((x) < (min)) ? (min) : (((x) > (max) ? (max) : (x)))
+
 namespace AKPLATFORM
 {
 	// Simple automatic event API
@@ -98,11 +107,15 @@ namespace AKPLATFORM
 	/// Platform Independent Helper
 	inline AKRESULT AkCreateEvent( AkEvent & out_event )
     {
+#ifdef AK_USE_UWP_API
+		out_event = CreateEventEx(nullptr, nullptr, 0, STANDARD_RIGHTS_ALL|EVENT_MODIFY_STATE);
+#else
 		out_event = ::CreateEvent( NULL,					// No security attributes
                                     false,					// Reset type: automatic
                                     false,					// Initial signaled state: not signaled
                                     NULL                    // No name
                                    );
+#endif
 		return ( out_event ) ? AK_Success : AK_Fail;
 	}
 
@@ -117,13 +130,12 @@ namespace AKPLATFORM
 	/// Platform Independent Helper
 	inline void AkWaitForEvent( AkEvent & in_event )
 	{
+#ifdef AK_USE_UWP_API
+		DWORD dwWaitResult = ::WaitForSingleObjectEx( in_event, INFINITE, FALSE );
+        AKASSERT( dwWaitResult == WAIT_OBJECT_0 );
+#else
         AKVERIFY( ::WaitForSingleObject( in_event, INFINITE ) == WAIT_OBJECT_0 );
-	}
-
-	/// Platform Independent Helper
-	inline bool AkWaitForEvent( AkEvent & in_event, AkUInt32 in_dwMilliseconds )
-	{
-        return ::WaitForSingleObject( in_event, in_dwMilliseconds ) == WAIT_OBJECT_0;
+#endif
 	}
 
 	/// Platform Independent Helper
@@ -141,11 +153,21 @@ namespace AKPLATFORM
 	/// Platform Independent Helper
 	inline AKRESULT AkCreateSemaphore(AkSemaphore& out_semaphore, AkUInt32 in_initialCount)
 	{
+#ifdef AK_USE_UWP_API
+		out_semaphore = ::CreateSemaphoreEx(
+			NULL,				// no security attributes
+			in_initialCount,	// initial count
+			INT_MAX,			// no maximum -- matches posix semaphore behaviour
+			NULL,				// no name
+			0,					// reserved
+			STANDARD_RIGHTS_ALL | SEMAPHORE_MODIFY_STATE);
+#else
 		out_semaphore = ::CreateSemaphore(
 			NULL,				// no security attributes
 			in_initialCount,	// initial count
 			INT_MAX,			// no maximum -- matches posix semaphore behaviour
 			NULL);				// no name
+#endif
 		return (out_semaphore) ? AK_Success : AK_Fail;
 	}
 
@@ -167,10 +189,201 @@ namespace AKPLATFORM
 		AKVERIFY(ReleaseSemaphore(in_semaphore, in_count, NULL) >= 0);
 	}
 
+	// Virtual Memory
+	// ------------------------------------------------------------------
+
+#ifdef AK_WIN_UNIVERSAL_APP
+	AkForceInline void* AllocVM(size_t size, size_t* /*extra*/)
+	{
+		return VirtualAllocFromApp(NULL, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+	}
+#else
+	AkForceInline void* AllocVM(size_t size, size_t* /*extra*/)
+	{
+		return VirtualAlloc(NULL, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+	}
+
+#endif
+	AkForceInline void FreeVM(void* address, size_t size, size_t /*extra*/, size_t release)
+	{
+		VirtualFree(address, release ? 0 : size, release ? MEM_RELEASE : MEM_DECOMMIT);
+	}
+
     // Threads
     // ------------------------------------------------------------------
 
+	/// Platform Independent Helper
+	inline bool AkIsValidThread( AkThread * in_pThread )
+	{
+		return (*in_pThread != AK_NULL_THREAD);
+	}
+
+	/// Platform Independent Helper
+	inline void AkClearThread( AkThread * in_pThread )
+	{
+		*in_pThread = AK_NULL_THREAD;
+	}
+
+	/// Platform Independent Helper
+    inline void AkCloseThread( AkThread * in_pThread )
+    {
+        AKASSERT( in_pThread );
+        AKASSERT( *in_pThread );
+        AKVERIFY( ::CloseHandle( *in_pThread ) );
+        AkClearThread( in_pThread );
+    }
+
 #define AkExitThread( _result ) return _result;
+
+	/// Platform Independent Helper
+	inline void AkGetDefaultThreadProperties( AkThreadProperties & out_threadProperties )
+	{
+		out_threadProperties.nPriority = AK_THREAD_PRIORITY_NORMAL;
+		out_threadProperties.uStackSize= AK_DEFAULT_STACK_SIZE;
+#ifdef AK_WIN_UNIVERSAL_APP
+		out_threadProperties.processorNumber.Group = 0;
+		out_threadProperties.processorNumber.Number = MAXIMUM_PROCESSORS;
+		out_threadProperties.processorNumber.Reserved = 0;
+#else
+		out_threadProperties.dwAffinityMask = 0;
+#endif
+	}
+
+	/// Set the name of a thread: see http://msdn.microsoft.com/en-us/library/xcb2z8hs.aspx
+	inline void AkSetThreadName( DWORD in_dwThreadID, LPCSTR in_szThreadName )
+	{
+		const DWORD MS_VC_EXCEPTION=0x406D1388;
+
+#pragma pack(push,8)
+		typedef struct tagTHREADNAME_INFO
+		{
+			DWORD dwType;
+			LPCSTR szName;
+			DWORD dwThreadID;
+			DWORD dwFlags;
+		} THREADNAME_INFO;
+#pragma pack(pop)
+
+		THREADNAME_INFO info;
+		info.dwType = 0x1000;
+		info.szName = in_szThreadName;
+		info.dwThreadID = in_dwThreadID;
+		info.dwFlags = 0;
+
+		__try
+		{
+			RaiseException( MS_VC_EXCEPTION, 0, sizeof(info)/sizeof(ULONG_PTR), (ULONG_PTR*)&info );
+		}
+#pragma warning(suppress: 6312 6322)
+		__except(EXCEPTION_CONTINUE_EXECUTION)
+		{
+		}
+	}
+
+	/// Platform Independent Helper
+	inline void AkCreateThread( 
+		AkThreadRoutine pStartRoutine,					// Thread routine.
+		void * pParams,									// Routine params.
+		const AkThreadProperties & in_threadProperties,	// Properties. NULL for default.
+		AkThread * out_pThread,							// Returned thread handle.
+		const char * in_szThreadName )						// Opt thread name.
+    {
+		AKASSERT( out_pThread != NULL );
+		AKASSERT( (in_threadProperties.nPriority >= THREAD_PRIORITY_LOWEST && in_threadProperties.nPriority <= THREAD_PRIORITY_HIGHEST)
+			|| ( in_threadProperties.nPriority == THREAD_PRIORITY_TIME_CRITICAL )
+			|| ( in_threadProperties.nPriority == THREAD_MODE_BACKGROUND_BEGIN ) );
+
+		DWORD dwThreadID;
+        *out_pThread = ::CreateThread( NULL,							// No security attributes
+                                       in_threadProperties.uStackSize,	// StackSize (0 uses system default)
+                                       pStartRoutine,                   // Thread start routine
+                                       pParams,                         // Thread function parameter
+                                       0,								// Creation flags: create running
+                                       &dwThreadID );
+
+		// ::CreateThread() return NULL if it fails.
+        if ( !*out_pThread )
+        {
+			AkClearThread( out_pThread );
+            return;
+        }
+
+        // Set thread name.
+        AkSetThreadName( dwThreadID, in_szThreadName );
+
+		// Set properties.
+		if ( !::SetThreadPriority( *out_pThread, in_threadProperties.nPriority ) &&
+			 in_threadProperties.nPriority != THREAD_MODE_BACKGROUND_BEGIN )
+        {
+            AKASSERT( !"Failed setting thread priority" );
+			AkCloseThread( out_pThread );
+            return;
+        }
+#ifdef AK_WIN_UNIVERSAL_APP
+		if ( in_threadProperties.processorNumber.Number != MAXIMUM_PROCESSORS)
+        {
+			if ( !SetThreadIdealProcessorEx( *out_pThread, const_cast<PPROCESSOR_NUMBER>(&in_threadProperties.processorNumber), NULL) )
+            {
+                AKASSERT( !"Failed setting thread ideal processor" );
+				AkCloseThread( out_pThread );
+            }
+		}
+#else
+		if (in_threadProperties.dwAffinityMask)
+		{
+			if (!::SetThreadAffinityMask(*out_pThread, in_threadProperties.dwAffinityMask))
+			{
+				AKASSERT(!"Failed setting thread affinity mask");
+				AkCloseThread(out_pThread);
+			}
+		}
+#endif
+	}
+
+	/// Platform Independent Helper
+    inline void AkWaitForSingleThread( AkThread * in_pThread )
+    {
+        AKASSERT( in_pThread );
+        AKASSERT( *in_pThread );
+#ifdef AK_USE_UWP_API
+        ::WaitForSingleObjectEx( *in_pThread, INFINITE, FALSE );
+#else
+        ::WaitForSingleObject( *in_pThread, INFINITE );
+#endif
+    }
+
+	/// Returns the calling thread's ID.
+	inline AkThreadID CurrentThread()
+	{
+		return ::GetCurrentThreadId();
+	}
+
+	/// Platform Independent Helper
+    inline void AkSleep( AkUInt32 in_ulMilliseconds )
+    {
+		::Sleep( in_ulMilliseconds );
+    }
+
+	// Optimized memory functions
+	// --------------------------------------------------------------------
+
+	/// Platform Independent Helper
+	inline void AkMemCpy( void * pDest, const void * pSrc, AkUInt32 uSize )
+	{
+		memcpy( pDest, pSrc, uSize );
+	}
+
+	/// Platform Independent Helper
+	inline void AkMemMove( void* pDest, const void* pSrc, AkUInt32 uSize )
+	{
+		memmove( pDest, pSrc, uSize );
+	}
+
+	/// Platform Independent Helper
+	inline void AkMemSet( void * pDest, AkInt32 iVal, AkUInt32 uSize )
+	{
+		memset( pDest, iVal, uSize );
+	}
 
     // Time functions
     // ------------------------------------------------------------------
@@ -200,6 +413,38 @@ namespace AKPLATFORM
     {
         return ( in_iNow - in_iStart ) / AK::g_fFreqRatio;
     }
+
+#if defined(AK_XBOXSERIESX)
+	// Waits for a limited amount of time for in_pVal to hit zero (without yielding the thread)
+	inline void AkLimitedSpinForZero(AkAtomic32* in_pVal)
+	{
+		// monitorx and waitx are available on certain AMD CPUs, so we can have a custom impl of AkLimitedSpinForZero
+		AkInt64 endSpinTime = 0;
+		AkInt64 currentTime = 0;
+		PerformanceCounter(&endSpinTime);
+		endSpinTime += AkInt64(AK::g_fFreqRatio * 0.01); // only spin for about 10us
+		while (true)
+		{
+			// set up monitorx on pVal
+			_mm_monitorx((void*)in_pVal, 0U, 0U);
+			// if pval is zero, skip out
+			if (AkAtomicLoad32(in_pVal) == 0)
+			{
+				break;
+			}
+			// wait until a store to pVal occurs (or ~1us passes)
+			_mm_mwaitx(2U, 0U, 1000U);
+
+			// Check if we've hit the deadline for the timeout
+			PerformanceCounter(&currentTime);
+			if (currentTime > endSpinTime)
+			{
+				break;
+			}
+		}
+	}
+#define AK_LIMITEDSPINFORZERO // mark AkLimitedSpinForZero as defined to avoid duplicate definitions
+#endif
 
 	/// String conversion helper. If io_pszAnsiString is null, the function returns the required size.
 	inline AkInt32 AkWideCharToChar( const wchar_t*	in_pszUnicodeString,
@@ -295,6 +540,9 @@ namespace AKPLATFORM
 		return r;
 	}
 
+	/// Stack allocations.
+	#define AkAlloca( _size_ ) _alloca( _size_ )
+
 	/// Output a debug message on the console
 #if ! defined(AK_OPTIMIZED)
 	inline void OutputDebugMsg( const wchar_t* in_pszMsg )
@@ -382,11 +630,6 @@ namespace AKPLATFORM
 
 	template <int MaxSize = 0>
 	inline void OutputDebugMsgV(const char*, ...) {}
-#endif
-
-	// Support for AK_DEBUG_BREAK macro
-#if !defined(AK_OPTIMIZED)
-	#define AK_DEBUG_BREAK if (IsDebuggerPresent()) { DebugBreak(); } else { AK_FORCE_CRASH; }
 #endif
 
 	/// Converts a wchar_t string to an AkOSChar string.
@@ -489,13 +732,53 @@ namespace AKPLATFORM
 	}
 
 	// Use with AkOSChar.
-	#define AK_PATH_SEPARATOR	L"\\"
-	#define AK_LIBRARY_PREFIX	L""
-	#define AK_DYNAMIC_LIBRARY_EXTENSION	L".dll"
+	#define AK_PATH_SEPARATOR	(L"\\")
+	#define AK_LIBRARY_PREFIX	(L"")
+	#define AK_DYNAMIC_LIBRARY_EXTENSION	(L".dll")
 
 	#define AK_FILEHANDLE_TO_UINTPTR(_h) ((AkUIntPtr)_h)
 	#define AK_SET_FILEHANDLE_TO_UINTPTR(_h,_u) _h = (AkFileHandle)_u
 
+	#if defined(AK_ENABLE_PERF_RECORDING)
+	
+		static AkUInt32 g_uAkPerfRecExecCount = 0;	
+		static AkReal32 g_fAkPerfRecExecTime = 0.f;
+
+		#define AK_PERF_RECORDING_RESET()	\
+			AKPLATFORM::g_uAkPerfRecExecCount = 0;\
+			AKPLATFORM::g_fAkPerfRecExecTime = 0.f;
+
+		#define AK_PERF_RECORDING_START( __StorageName__, __uExecutionCountStart__, __uExecutionCountStop__ )						\
+			AkInt64 iAkPerfRecTimeBefore;																							\
+			if ( (AKPLATFORM::g_uAkPerfRecExecCount >= (__uExecutionCountStart__)) && (AKPLATFORM::g_uAkPerfRecExecCount <= (__uExecutionCountStop__)) )	\
+				AKPLATFORM::PerformanceCounter( &iAkPerfRecTimeBefore );
+
+		#define AK_PERF_RECORDING_STOP( __StorageName__, __uExecutionCountStart__, __uExecutionCountStop__ )						\
+			if ( (AKPLATFORM::g_uAkPerfRecExecCount >= (__uExecutionCountStart__)) && (AKPLATFORM::g_uAkPerfRecExecCount <= (__uExecutionCountStop__)) )	\
+			{																														\
+				AkInt64 iAkPerfRecTimeAfter;																						\
+				AKPLATFORM::PerformanceCounter( &iAkPerfRecTimeAfter );																\
+				AKPLATFORM::g_fAkPerfRecExecTime += AKPLATFORM::Elapsed( iAkPerfRecTimeAfter, iAkPerfRecTimeBefore );				\
+				if ( AKPLATFORM::g_uAkPerfRecExecCount == (__uExecutionCountStop__) )												\
+				{																													\
+					AkReal32 fAverageExecutionTime = AKPLATFORM::g_fAkPerfRecExecTime/((__uExecutionCountStop__)-(__uExecutionCountStart__));	\
+					AkOSChar str[256];																								\
+					swprintf_s(str, 256, AKTEXT("%s average execution time: %f\n"), AKTEXT(__StorageName__), fAverageExecutionTime);\
+					AKPLATFORM::OutputDebugMsg( str );																				\
+				}																													\
+			}																														\
+			AKPLATFORM::g_uAkPerfRecExecCount++;
+	#endif // AK_ENABLE_PERF_RECORDING
+
+#if (defined(AK_CPU_X86_64) || defined(AK_CPU_X86))
+	/// Support to fetch the CPUID for the platform. Only valid for X86 targets
+	/// \remark Note that IAkProcessorFeatures should be preferred to fetch this data
+	/// as it will have already translated the feature bits into AK-relevant enums
+	inline void CPUID(AkUInt32 in_uLeafOpcode, AkUInt32 in_uSubLeafOpcode, unsigned int out_uCPUFeatures[4])
+	{
+		__cpuidex((int*)out_uCPUFeatures, in_uLeafOpcode, in_uSubLeafOpcode);
+	}
+#endif
 }
 
 #endif  // _AK_PLATFORM_FUNCS_H_

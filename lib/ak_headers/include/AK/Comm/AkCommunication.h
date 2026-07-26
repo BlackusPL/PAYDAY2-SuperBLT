@@ -21,7 +21,7 @@ under the Apache License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
 OR CONDITIONS OF ANY KIND, either express or implied. See the Apache License for
 the specific language governing permissions and limitations under the License.
 
-  Copyright (c) 2026 Audiokinetic Inc.
+  Copyright (c) 2023 Audiokinetic Inc.
 *******************************************************************************/
 
 /// \file AK/Comm/AkCommunication.h
@@ -35,6 +35,8 @@ the specific language governing permissions and limitations under the License.
 #define _AK_COMMUNICATION_H
 
 #include <AK/SoundEngine/Common/AkTypes.h>
+#include <AK/SoundEngine/Common/AkMemoryMgr.h>
+#include <AK/Tools/Common/AkPlatformFuncs.h>
 
 #define AK_COMM_SETTINGS_MAX_STRING_SIZE 64
 #define AK_COMM_SETTINGS_MAX_URL_SIZE 128
@@ -46,7 +48,7 @@ the specific language governing permissions and limitations under the License.
 struct AkCommSettings
 {
 	AkCommSettings()
-		:commSystem(AkCommSystem_Socket)
+		: commSystem(AkCommSystem_Socket)
 	{
 		szAppNetworkName[0] = 0;
 		szCommProxyServerUrl[0] = 0;
@@ -75,9 +77,9 @@ struct AkCommSettings
 		/// This is where the authoring application broadcasts "Game Discovery" requests
 		/// to discover games running on the network. Default value: 24024.
 		///
-		/// \warning Unlike the other port in this structure, this port cannot be dynamic: setting it
-		/// to 0 will disable discovery. See \ref initialization_comm_ports_discovery_broadcast
-		/// for more details.
+		/// \warning Unlike the other port in this structure, this port cannot be dynamic
+		///          (cannot be set to 0). Refer to \ref initialization_comm_ports_discovery_broadcast
+		///          for more details.
 		AkUInt16 uDiscoveryBroadcast;
 
 		/// Used by the "command" channel.
@@ -95,9 +97,8 @@ struct AkCommSettings
 	/// Allows selecting the communication system used to connect remotely the Authoring tool on the device.
 	enum AkCommSystem
 	{
-		AkCommSystem_Socket,	/// The default communication system when other systems are unavailable.
-		AkCommSystem_HTCS, 		/// HTCS is prioritized if available.
-		AkCommSystem_Last		/// End of enum, invalid value.
+		AkCommSystem_Socket,	/// The recommended default communication system
+		AkCommSystem_HTCS 		/// HTCS when available only, will default to AkCommSystem_Socket if the HTCS system is not available.
 	};
 
 	/// Select the device of the communication system.
@@ -191,13 +192,6 @@ namespace AK
 		/// \return
 		///      - AK_Success if initialization was successful.
 		AK_EXTERNAPIFUNC( const AkCommSettings&, GetCurrentSettings )();
-
-
-		/// Get the port currently in used by the command channel.
-		///
-		/// \return
-		///      - Port number.
-		AK_EXTERNAPIFUNC( AkUInt16, GetCommandPort )();
 
 		//@}
 	}

@@ -21,7 +21,7 @@ under the Apache License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
 OR CONDITIONS OF ANY KIND, either express or implied. See the Apache License for
 the specific language governing permissions and limitations under the License.
 
-  Copyright (c) 2026 Audiokinetic Inc.
+  Copyright (c) 2023 Audiokinetic Inc.
 *******************************************************************************/
 
 #pragma once
@@ -40,7 +40,7 @@ namespace AK
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_FileNotFound"), AKTEXT("File %s not found in path(s): %s")),
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_CannotOpenFile"), AKTEXT("Cannot open file %s in path(s): %s")),
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_CannotStartStreamNoMemory"), AKTEXT("Not enough memory in I/O pool to start stream")),
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_IODeviceStr"), AKTEXT("Unknown I/O device error. %s returned %u on file %s.")),
+			ERROR_CODE_DEF(AKTEXT("ErrorCode_IODevice"), AKTEXT("Unknown I/O device error")),
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_IncompatibleIOSettings"), AKTEXT("I/O settings incompatible.")),
 
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_PluginUnsupportedChannelConfiguration"), AKTEXT("Plug-in unsupported channel configuration: $p")),
@@ -84,6 +84,9 @@ namespace AK
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_MediaNotLoaded"), AKTEXT("Media $m was not loaded for this source")),
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_VoiceStarving"), AKTEXT("Voice Starvation")),
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_StreamingSourceStarving"), AKTEXT("Source starvation")),
+			ERROR_CODE_DEF(AKTEXT("ErrorCode_XMADecoderSourceStarving"),	AKTEXT("XMA decoder starvation")),
+			ERROR_CODE_DEF(AKTEXT("ErrorCode_XMADecodingError"),	AKTEXT("XMA decoding error")),
+			ERROR_CODE_DEF(AKTEXT("ErrorCode_InvalidXMAData"), AKTEXT("Invalid XMA data - Make sure data is allocated from APU memory and is aligned to 2K.")),
 
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_PluginNotRegistered"), AKTEXT("Plug-in not found: $p")),
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_CodecNotRegistered"), AKTEXT("Codec plug-in not registered: $p")),
@@ -116,6 +119,9 @@ namespace AK
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_FileFormatMismatch"), AKTEXT("Source file is of different format than expected")),
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_CommandQueueFull"), AKTEXT("Audio command queue is full, blocking caller.  Reduce number of calls to sound engine or boost command queue memory.")),
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_CommandTooLarge"), AKTEXT("Audio command is too large to fit in the command queue.  Break the command in smaller pieces.")),
+
+			ERROR_CODE_DEF(AKTEXT("ErrorCode_XMACreateDecoderLimitReached"), AKTEXT("Failed creating XMA decoder: no more XMA voices available")),
+			ERROR_CODE_DEF(AKTEXT("ErrorCode_XMAStreamBufferTooSmall"), AKTEXT("Failed seeking in XMA source: stream buffer is smaller than XMA block size")),
 
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_ModulatorScopeError_Inst"), AKTEXT("Triggered a note-scoped or playing-instance-scoped modulator in a global context (such as a bus or bus effect).  Modulator will have global scope.")),
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_ModulatorScopeError_Obj"), AKTEXT("Triggered a game-object-scoped modulator in a global context (such as a bus or bus effect).  Modulator will have global scope.")),
@@ -212,18 +218,17 @@ namespace AK
 
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_NotEnoughMemInFunction"), AKTEXT("Not enough memory to complete the operation in %s")),
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_FXNotFound"), AKTEXT("Effect Shareset not found in function %s")),
+			ERROR_CODE_DEF(AKTEXT("ErrorCode_SetMixerNotABus"), AKTEXT("SetMixer can only apply to Bus or Aux Bus.")),
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_AudioNodeNotFound"), AKTEXT("Audio node not found in call to %s")),
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_SetBusConfigUnsupported"), AKTEXT("SetBusConfig and ResetBusConfig cannot modify master bus speaker configuration, it is dictated by the output device.")),
+			ERROR_CODE_DEF(AKTEXT("ErrorCode_SetMixerFailed"), AKTEXT("SetMixer: Plug-in instanciation failed.")),
+			ERROR_CODE_DEF(AKTEXT("ErrorCode_SetBusConfigUnsupported"), AKTEXT("SetBusConfig cannot modify master bus speaker configuration, it is dictated by the audio hardware.")),
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_BusNotFound"), AKTEXT("%s: Bus not found in Init bank.")),
 
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_MismatchingMediaSize"), AKTEXT("Mismatching media size error for file $m. Possibly caused by mismatching sound bank or WEM resources. WEM is %u bytes and sound bank expects %u bytes.")),
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_IncompatibleBankVersion"), AKTEXT("Load bank failed : incompatible bank version. Bank was generated with %s version of Wwise. The Bank version is %i and the current runtime SDK version is %i (%s)")),
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_UnexpectedPrepareGameSyncsCall"), AKTEXT("Unexpected call to PrepareGameSyncs. See: \"bEnableGameSyncPreparation\" parameter in AkInitSettings for more information")),
+			ERROR_CODE_DEF(AKTEXT("ErrorCode_MusicEngineNotInitialized"), AKTEXT("Music engine not initialized. Content can not be loaded from bank.")),
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_LoadingBankMismatch"), AKTEXT("Type mismatch while loading bank. Object $w is a %s in the currently loading bank. It was a %s in bank $b")),
-
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_ProxyObjectMismatch"), AKTEXT("Type mismatch while synching object from Wwise. Object $w was to be synched as a %s, but already existed as a %s")),
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_ProxyObjectMemory"), AKTEXT("Error synching object from Wwise. Object $w of type %s could not by synched due to low memory conditions")),
-
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_MasterBusStructureNotLoaded"), AKTEXT("Output bus $w not found. Make sure that the Init bank is loaded first.")),
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_TooManyChildren"), AKTEXT("Too many children in one single container. Current count: %u; Limit: %u")),
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_BankContainUneditableEffect"), AKTEXT("Warning: Bank contains rendered source effects which can't be edited in Wwise")),
@@ -232,6 +237,11 @@ namespace AK
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_SoundLoadFailedInsufficientMemory"), AKTEXT("Insufficient memory preparing media. Sound will not play.")),
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_NXDeviceRegistrationFailed"), AKTEXT("NX audio device notification registration failed, output format changes will not be detected.")),
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_MixPluginOnObjectBus"), AKTEXT("Mixer plugins not supported on object busses")),
+			ERROR_CODE_DEF(AKTEXT("ErrorCode_XboxXMAVoiceResetFailed"), AKTEXT("XMA Voice Reset failed, voice may leak.")),
+			ERROR_CODE_DEF(AKTEXT("ErrorCode_XboxACPMessage"), AKTEXT("ACP_MESSAGE: %s")),
+			ERROR_CODE_DEF(AKTEXT("ErrorCode_XboxFrameDropped"), AKTEXT("XMA Error, frame dropped. Audible glitch possible.")),
+			ERROR_CODE_DEF(AKTEXT("ErrorCode_XboxACPError"), AKTEXT("ACP ERROR: %s")),
+			ERROR_CODE_DEF(AKTEXT("ErrorCode_XboxXMAFatalError"), AKTEXT("XMA Fatal Error, sound will be terminated.")),
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_MissingMusicNodeParent"), AKTEXT("Missing music node parent. Make sure all banks containing music structures are completely loaded.")),
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_HardwareOpusDecoderError"), AKTEXT("Hardware Opus Decoder error: %i. Sound killed.")),
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_SetGeometryTooManyTriangleConnected"), AKTEXT("AK::SpatialAudio::SetGeometry - More than two triangles (%i, %i, %i) are connected to the same edge [%i, %i].")),
@@ -254,7 +264,7 @@ namespace AK
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_SetGameObjectRadiusSizeError"), AKTEXT("AK::SpatialAudio::SetGameObjectRadius: Outer radius must be greater than inner radius.")),
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_SetPortalNonDistinctRoom"), AKTEXT("AK::SpatialAudio::SetPortal: Portal \"%s\" (ID:%llu) must have a front room which is distinct from its back room.")),
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_SetPortalInvalidExtent"), AKTEXT("AK::SpatialAudio::SetPortal: Invalid extent. Extent dimensions must be positive.")),
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_SpatialAudio_PortalNotFound"), AKTEXT("Portal %llu not found in function %s.")),
+			ERROR_CODE_DEF(AKTEXT("ErrorCode_SpatialAudio_PortalNotFound"), AKTEXT("Portal %u not found in function %s.")),
 
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_InvalidFloatInFunction"), AKTEXT("Invalid float in parameter %s of function %s")),
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_FLTMAXNotSupported"), AKTEXT("%s: FLT_MAX not supported")),
@@ -287,48 +297,16 @@ namespace AK
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_DataAlignement"), AKTEXT("Bank or Media pointer not aligned to %i bytes.")),
 
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_PluginMsgWithShareSet"), AKTEXT("%s (Plugin: $p Shareset: $w)")),
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_SoundEngineNotInit"), AKTEXT("SoundEngine is not initialized yet or Init bank has not been loaded. Function: %s.")),
+			ERROR_CODE_DEF(AKTEXT("ErrorCode_SoundEngineNotInit"), AKTEXT("SoundEngine is not initalized yet or Init bank has not been loaded. Function: %s.")),
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_NoDefaultSwitch"), AKTEXT("No default Switch value selected in group $s.")),
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_CantSetBoundSwitch"), AKTEXT("Switch $s is bound to RTPC $w. It can not be set directly.")),
 
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_IODeviceInitFailed"), AKTEXT("I/O Device initialization failed. Streaming from file will not be possible.")),
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_SwitchListEmpty"), AKTEXT("Switch Group $s has no Switch Values. Switch container will do nothing.")),
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_NoSwitchSelected"), AKTEXT("No Switch Group selected for this Switch container.")),
-
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_FilePermissionError"), AKTEXT("File %s could not be opened due to permissions, access rights or conflicting open modes. (Found in path(s): %s)")),
-
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_SetEffectOnRendered"), AKTEXT("%s: Cannot set Effect because the target object has a rendered Effect (either in the provided slot, or in a lower slot).")),
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_GeometryNotWatertight"), AKTEXT("AK::SpatialAudio::SetGeometryInstance - Geometry %s (%llu) is not watertight. Geometry used for Room definition must be watertight if the Room is a Reverb Zone, or if containment in this Room is managed by Spatial Audio. If that is the case, add the missing triangles with a transmission loss value set to 0.")),
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_CannotInitialize3DAudio"), AKTEXT("Could not initialize 3D audio.")),
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_CannotInitializeInputCallbacks"), AKTEXT("Could not connect to audio input device. Audio input callback will not be called.")),
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_CannotConnectAVAudioEngineSource"), AKTEXT("Failed to connect System Audio Object to Apple Spatial Audio. Some sounds will not be audible.")),
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_ChannelConfigRequestDenied"), AKTEXT("Audio Device could not honor the channel config requested with AkOutputSettings; default config will be used.")),
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_MediaUpdatedFromWwise"), AKTEXT("Media updated: $m transferred from Wwise Project. Glitches might be heard. Previous media from other sources (bank, prepared, etc) will be ignored.")),
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_MediaErrorFromWwise"), AKTEXT("Media $m could not be updated from Wwise Project. Previous media, if available, will be used.")),
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_OutputAlreadyExists"), AKTEXT("AK::SoundEngine::AddOutput: Output already exists, not added a second time. Shareset: $w Device: %u.")),
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_UnknownStateGroup"), AKTEXT("Unknown State Group ($s) referred by object. The State Group is added (with empty transition table).")),
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_MediaErrorWwiseMRUFull"), AKTEXT("Not enough space to update media $m from Wwise Project. Increase \"Memory for media updates\" in Audio menu.")),
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_AudioOut2ContextCreateError"), AKTEXT("sceAudioOut2ContextCreate failed with error code %i during soundengine initialization. Review documentation for more information (parameters: maxObjectPorts %u, maxPorts %u, numGrains %u, queueDepth %u)")),
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_AudioOut2UserCreateError"), AKTEXT("sceAudioOut2UserCreate failed with error code %i during output device initialization. Review documentation for more information (parameters: userId %u; pluginID: %u)")),
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_FeedbackOnAudioObjectsBus"), AKTEXT("Unsupported feedback connection to Audio Objects bus $w. Some audio data may be lost.")),
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_SpatialAudio_SiblingPortal"), AKTEXT("%s: Portals cannot connect rooms that are in the same Reverb Zone hierarchy.")),
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_ActivityPlayback_Warning"), AKTEXT("Critically high number of active playback instances.")),
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_CannotPlaySource_FileAccess"), AKTEXT("File access error during source creation. Look for previous file errors in the log.")),
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_MediaDiscrepancy"), AKTEXT("Inconsistent content for media $m between banks $b and $b. Soundbanks will have to be regenerated and redeployed.")),
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_WwiseIODisconnected"), AKTEXT("Wwise disconnected during transfer of file $m. Sound will be terminated. Other errors may occur.")),
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_WwiseIODisconnectedStr"), AKTEXT("Wwise disconnected during transfer of file %s. Sound will be terminated. Other errors may occur.")),
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_IODevice"), AKTEXT("Unknown I/O device error. %s returned %u on file $m.")),
-
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_InvalidCommand"), AKTEXT("Invalid Sound Engine command received. Command will be skipped. ID: %i (%s)")),
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_PlayingIDAlreadyExists"), AKTEXT("Playing ID already exists. New playing IDs must be generated when posting events. ID: %i")),
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_IOStreamLeak"), AKTEXT("I/O Error: Stream $m did not terminate normally (code %i). Memory leak detected.")),
-
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_SetSidechainMixConfigInvalid"), AKTEXT("Invalid channel configuration specified for SetSidechainMixConfig. Audio Objects configuration is not supported.")),
-
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_NodeNotCompatibleWithMidi"), AKTEXT("Container is not compatible with MIDI playback. This may be because the container is configured in continuous mode.")),
 		};
 
-		static_assert(AK::Monitor::Num_ErrorCodes == 227, "ARRAYSIZE(AK::Monitor::s_aszMonitorErrorInfos) is not matching AK::Monitor::Num_ErrorCodes, make sure they are maintained at the same time.");
+		static_assert((sizeof(s_aszMonitorErrorInfos) / sizeof(s_aszMonitorErrorInfos[0])) == AK::Monitor::Num_ErrorCodes, "ARRAYSIZE(AK::Monitor::s_aszMonitorErrorInfos) is not matching AK::Monitor::Num_ErrorCodes, make sure they are maintained at the same time.");
 	}
 
 }

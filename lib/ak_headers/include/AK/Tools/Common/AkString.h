@@ -21,13 +21,12 @@ under the Apache License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
 OR CONDITIONS OF ANY KIND, either express or implied. See the Apache License for
 the specific language governing permissions and limitations under the License.
 
-  Copyright (c) 2026 Audiokinetic Inc.
+  Copyright (c) 2023 Audiokinetic Inc.
 *******************************************************************************/
 #pragma once
 
 #include <AK/Tools/Common/AkFNVHash.h>
 #include <AK/Tools/Common/AkHashList.h>
-#include <AK/Tools/Common/AkPlacementNew.h>
 
 template<typename TAlloc, typename T_CHAR>
 class AkStringData : public TAlloc
@@ -251,6 +250,12 @@ public:
 	}
 };
 
+struct AkNonThreaded
+{
+	AkForceInline void Lock() {}
+	AkForceInline void Unlock() {}
+};
+
 template<typename TAlloc, typename T_CHAR>
 static AkForceInline AkUInt32 AkHash(const AkString<TAlloc, T_CHAR>& in_str)
 {
@@ -267,11 +272,11 @@ static AkForceInline AkUInt32 AkHash(const AkString<TAlloc, T_CHAR>& in_str)
 // AkDbString - A string reference class that stores a hash to a string in a database.  If an identical string is found, the reference count in the database is incremented,
 //	so that we do not store duplicate strings.  Database can be made multi thread safe by passing in CAkLock for tLock, or AkNonThreaded if concurrent access is not needed.
 //
-template<typename TAlloc, typename T_CHAR>
+template<typename TAlloc, typename T_CHAR, typename tLock = AkNonThreaded>
 class AkDbString : public TAlloc
 {
 public: 
-	typedef AkDbString<TAlloc, T_CHAR> tThis;
+	typedef AkDbString<TAlloc, T_CHAR, tLock> tThis;
 	typedef AkString<TAlloc, T_CHAR> tString;
 
 	struct Entry
@@ -287,6 +292,7 @@ public:
 	struct Instance : public TAlloc
 	{
 		tStringTable table;
+		tLock lock;
 	};
 
 public:
@@ -297,12 +303,7 @@ public:
 		if (pInstance == NULL)
 		{
 			pInstance = (Instance*)pInstance->TAlloc::Alloc(sizeof(Instance));
-
-			if (pInstance == nullptr)
-				return AK_Fail;
-
 			AkPlacementNew(pInstance) Instance();
-			
 			return AK_Success;
 		}
 		else
@@ -320,17 +321,8 @@ public:
 		}
 	}
 
-	static const T_CHAR* GetFromHash(AkUInt32 in_uHash)
-	{
-		if (in_uHash != 0)
-		{
-			Entry* pEntry = pInstance->table.Exists(in_uHash);
-			
-			if(pEntry)
-				return pEntry->str.Get();
-		}
-		return NULL;
-	}
+	static void UnlockDB() { pInstance->lock.Unlock();}
+	static void LockDB() { pInstance->lock.Lock(); }
 
 private:
 
@@ -376,7 +368,7 @@ public:
 
 	const T_CHAR* Get() const
 	{
-		if (pInstance && m_uHash != 0)
+		if (m_uHash != 0)
 		{
 			Entry* pEntry = pInstance->table.Exists(m_uHash);
 			AKASSERT(pEntry != NULL);
@@ -384,27 +376,6 @@ public:
 		}
 		return NULL;
 	}
-
-	tString GetString() const
-	{
-		if (pInstance && m_uHash != 0)
-		{
-			Entry* pEntry = pInstance->table.Exists(m_uHash);
-			AKASSERT(pEntry != NULL);
-			return pEntry->str;
-		}
-
-		return tString();
-	}
-	
-	void Reset()
-	{	
-		Release();
-
-		m_uHash = 0;
-	}
-
-	AkUInt32 GetHash() const { return m_uHash;  }
 
 protected:
 	
@@ -415,37 +386,37 @@ protected:
 
 		Release();
 
-		if (pInstance && in_str.Get() != NULL)
+		if (in_str.Get() != NULL)
 		{
 			m_uHash = AkHash(in_str);
 
-			Entry* pEntry = pInstance->table.Set(m_uHash);
-			if (pEntry != NULL)
+			LockDB();
 			{
-				pEntry->refCount++;
-
-				if (pEntry->str.Get() == NULL)
+				Entry* pEntry = pInstance->table.Set(m_uHash);
+				if (pEntry != NULL)
 				{
-					pEntry->str = in_str;
-					pEntry->str.AllocCopy();
+					pEntry->refCount++;
 
-					if (pEntry->str.Get() == NULL) // Allocation failure
+					if (pEntry->str.Get() == NULL)
 					{
-						pInstance->table.Unset(m_uHash);
-						m_uHash = 0;
-						res = AK_Fail;
+						pEntry->str = in_str;
+						pEntry->str.AllocCopy();
+
+						if (pEntry->str.Get() == NULL) // Allocation failure
+						{
+							pInstance->table.Unset(m_uHash);
+							m_uHash = 0;
+							res = AK_Fail;
+						}
 					}
 				}
+				else
+				{
+					m_uHash = 0;
+					res = AK_Fail;
+				}
 			}
-			else
-			{
-				m_uHash = 0;
-				res = AK_Fail;
-			}
-		}
-		else if (!pInstance)
-		{
-			res = AK_Fail;
+			UnlockDB();
 		}
 
 		return res;
@@ -458,18 +429,18 @@ protected:
 
 		Release();
 
-		if (pInstance && in_uHash != 0)
+		if (in_uHash != 0)
 		{
 			m_uHash = in_uHash;
-			Entry* pEntry = pInstance->table.Exists(m_uHash);
-			AKASSERT(pEntry != NULL);
+			LockDB();
+			{
+				Entry* pEntry = pInstance->table.Exists(m_uHash);
+				AKASSERT(pEntry != NULL);
 
-			pEntry->refCount++;
-			AKASSERT(pEntry->str.Get() != NULL);
-		}
-		else if (!pInstance)
-		{
-			res = AK_Fail;
+				pEntry->refCount++;
+				AKASSERT(pEntry->str.Get() != NULL);
+			}
+			UnlockDB();
 		}
 
 		return res;
@@ -479,8 +450,7 @@ protected:
 	{
 		if (m_uHash != 0)
 		{
-		
-			if (pInstance)
+			LockDB();
 			{
 				tStringTable& table = pInstance->table;
 				typename tStringTable::IteratorEx it = table.FindEx(m_uHash);
@@ -494,7 +464,8 @@ protected:
 					table.Erase(it);
 				}
 			}
-	
+			UnlockDB();
+
 			m_uHash = 0;
 		}
 	}
@@ -503,53 +474,5 @@ protected:
 
 };
 
-/// A AkDbWeakString always references a DbString. If the DbString content has been released then the AkDbWeakString will return a null value.
-/// A AkDbWeakString does not prevent the DbString content to be released.
-/// 
-template<typename TAlloc, typename T_CHAR>
-class AkDbWeakString
-{
-public:
-	typedef AkDbString<TAlloc, T_CHAR> _String;
-
-public:
-	AkDbWeakString()
-		: m_uHash(0)
-	{}
-
-	AkDbWeakString(const AkDbWeakString& in_rhs)
-		: m_uHash(in_rhs.m_uHash)
-	{}
-
-	AkDbWeakString(const _String& in_dbString)
-	{
-		m_uHash = in_dbString.GetHash();
-	}
-
-	AkDbWeakString& operator=(const _String& in_dbString)
-	{
-		m_uHash = in_dbString.GetHash();
-
-		return *this;
-	}
-
-	AkDbWeakString& operator=(const AkDbWeakString& in_rhs)
-	{
-		m_uHash = in_rhs.m_uHash;
-
-		return *this;
-	}
-
-	/// Returns the string content or null if the content does not exist anymore
-	///
-	const T_CHAR* Get() const
-	{
-		return _String::GetFromHash(m_uHash);
-	}
-
-private:
-	AkUInt32 m_uHash;
-};
-
-template<typename TAlloc, typename T_CHAR>
-typename AkDbString<TAlloc, T_CHAR>::Instance* AkDbString<TAlloc, T_CHAR>::pInstance = NULL;
+template<typename TAlloc, typename T_CHAR, typename tLock>
+typename AkDbString<TAlloc, T_CHAR, tLock>::Instance* AkDbString<TAlloc, T_CHAR, tLock>::pInstance = NULL;

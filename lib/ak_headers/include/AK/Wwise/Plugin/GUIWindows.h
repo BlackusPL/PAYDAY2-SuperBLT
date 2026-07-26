@@ -21,7 +21,7 @@ under the Apache License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
 OR CONDITIONS OF ANY KIND, either express or implied. See the Apache License for
 the specific language governing permissions and limitations under the License.
 
-  Copyright (c) 2026 Audiokinetic Inc.
+  Copyright (c) 2023 Audiokinetic Inc.
 *******************************************************************************/
 
 /**
@@ -58,7 +58,7 @@ extern "C" IMAGE_DOS_HEADER __ImageBase;
  * 
  * \param theID The resource ID of the control (checkbox or radio button)
  * \param theProp The name of the property, as defined in your plug-in's
- *        XML definition file (see \ref wwiseplugin_xml_properties_tag)
+ *        XML definition file (refer to \ref wwiseplugin_xml_properties_tag)
  * \sa
  * - \ref wwiseplugin_dialog_guide_poptable
  * - \ref wwiseplugin_xml_properties_tag

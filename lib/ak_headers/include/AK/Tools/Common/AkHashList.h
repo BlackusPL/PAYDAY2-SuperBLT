@@ -21,15 +21,15 @@ under the Apache License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
 OR CONDITIONS OF ANY KIND, either express or implied. See the Apache License for
 the specific language governing permissions and limitations under the License.
 
-  Copyright (c) 2026 Audiokinetic Inc.
+  Copyright (c) 2023 Audiokinetic Inc.
 *******************************************************************************/
 
 #ifndef _AKHASHLIST_H
 #define _AKHASHLIST_H
 
-#include <AK/Tools/Common/AkArray.h>
 #include <AK/Tools/Common/AkKeyDef.h>// for MapStruct
-#include <AK/Tools/Common/AkPlacementNew.h>
+#include <AK/Tools/Common/AkObject.h>
+#include <AK/Tools/Common/AkArray.h>
 
 // NOTE: when using this template, a hashing function of the following form must be available: 
 //
@@ -41,9 +41,9 @@ template < class T_KEY >
 AkForceInline AkHashType AkHash(T_KEY in_key) { return (AkHashType)in_key; }
 
 #define AK_HASH_SIZE_VERY_SMALL 11
-extern const AK_SELECTANY AkHashType kHashSizes[] = { 29, 53, 97, 193, 389, 769, 1543, 3079, 6151, 12289, 24593, 49157, 98317, 196613, 393241, 786433, 1572869, 3145739, 6291469, 12582917, 25165843, 50331653, 100663319, 201326611, 402653189, 805306457, 1610612741 };
-constexpr size_t kNumHashSizes = sizeof(kHashSizes) / sizeof(kHashSizes[0]);
-constexpr AkReal32 kHashTableGrowthFactor = 0.9f;
+static const AkHashType kHashSizes[] = { 29, 53, 97, 193, 389, 769, 1543, 3079, 6151, 12289, 24593, 49157, 98317, 196613, 393241, 786433, 1572869, 3145739, 6291469, 12582917, 25165843, 50331653, 100663319, 201326611, 402653189, 805306457, 1610612741 };
+static const size_t kNumHashSizes = sizeof(kHashSizes) / sizeof(kHashSizes[0]);
+static const AkReal32 kHashTableGrowthFactor = 0.9f; 
 
 template < class T_KEY, class T_ITEM, typename T_ALLOC = ArrayPoolDefault >
 class AkHashList: public T_ALLOC
@@ -1001,7 +1001,26 @@ public:
 		AKASSERT( m_uiSize == 0 );
 		m_table.Term();
 	}
+/*
+	void RemoveAll()
+	{
+		for ( AkHashType i = 0; i < HashSize(); ++i )
+		{
+			T_MAPSTRUCT * pItem = m_table[ i ];
+			while ( pItem != NULL )
+			{
+				T_MAPSTRUCT * pNextItem = LIST_POLICY::Next(pItem);
+				pItem->~T_MAPSTRUCT();
+				T_ALLOD::Free( pItem );
+				pItem = pNextItem;
+			}
+			
+			m_table[ i ] = NULL;
+		}
 
+		m_uiSize = 0;
+	}
+*/
 	T_MAPSTRUCT * Exists( T_KEY in_Key ) const
 	{
 		if (HashSize() > 0)

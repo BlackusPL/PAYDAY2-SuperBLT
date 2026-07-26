@@ -21,7 +21,7 @@ under the Apache License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
 OR CONDITIONS OF ANY KIND, either express or implied. See the Apache License for
 the specific language governing permissions and limitations under the License.
 
-  Copyright (c) 2026 Audiokinetic Inc.
+  Copyright (c) 2023 Audiokinetic Inc.
 *******************************************************************************/
 
 /// \file
@@ -73,20 +73,6 @@ namespace AK
 			return ReadBytes(&out_data, sizeof(T), cRead);
 		}
 
-		template<>
-		bool Read<bool>(
-			bool & out_data)
-		{
-			AkInt32 cRead;
-			uint8_t byte;
-			if (ReadBytes(&byte, 1, cRead))
-			{
-				out_data = byte;
-				return true;
-			}
-			return false;
-		}
-
 		/// Reads a simple type or structure.
 		/// \warning This method does not allow for error checking. Use other methods when error cases need to be handled.
 		/// \warning Not for object serialization.
@@ -95,13 +81,68 @@ namespace AK
 		T Read()
 		{
 			T value;
-			this->Read<T>(value);
+
+			AkInt32 cRead;
+			ReadBytes(&value, sizeof(T), cRead);
+
 			return value;
 		}
 
+		/// Reads a string into a fixed-size buffer.
+		/// \return	True if the operation was successful, False otherwise. An insufficient buffer size does not cause failure.
+		template<class CHAR_T>
+		bool ReadString(
+			CHAR_T * out_pszString,	///< Pointer to a fixed-size buffer
+			AkInt32 in_nMax)			///< Maximum number of characters to be read in out_pszString, including the terminating NULL character
+		{
+			AkInt32 cChars;
+			if (!Read<AkInt32>(cChars))
+				return false;
+
+			bool bRet = true;
+
+			if (cChars > 0)
+			{
+				AkInt32 cRead;
+
+				if (cChars < in_nMax)
+				{
+					ReadBytes(out_pszString, cChars * sizeof(CHAR_T), cRead);
+					out_pszString[cChars] = 0;
+
+					bRet = cRead == (AkInt32)(cChars * sizeof(CHAR_T));
+				}
+				else
+				{
+					ReadBytes(out_pszString, in_nMax * sizeof(CHAR_T), cRead);
+					out_pszString[in_nMax - 1] = 0;
+
+					bRet = cRead == (AkInt32)(in_nMax * sizeof(CHAR_T));
+
+					if (bRet)
+					{
+						// Read extra characters in temp buffer.
+						AkInt32 cRemaining = cChars - in_nMax;
+
+						CHAR_T * pTemp = new CHAR_T[cRemaining];
+
+						ReadBytes(pTemp, cRemaining * sizeof(CHAR_T), cRead);
+
+						bRet = cRead == (AkInt32)(cRemaining * sizeof(CHAR_T));
+
+						delete[] pTemp;
+					}
+				}
+			}
+			else
+			{
+				out_pszString[0] = 0;
+			}
+
+			return bRet;
+		}
 		//@}
 	};
-
 
 	/// Generic binary output interface.
 	/// \akwarning
@@ -139,15 +180,52 @@ namespace AK
 			return WriteBytes(&in_data, sizeof(T), cWritten);
 		}
 
-		template<>
-		bool Write<bool>(
-			const bool & in_data)
+		/// Writes a unicode string. 
+		/// \return	True if the operation was successful, False otherwise
+		bool WriteString(
+			const wchar_t * in_pszString)	///< String to be written
 		{
-			AkInt32 cWritten;
-			const uint8_t byte = in_data;
-			return WriteBytes(&byte, 1, cWritten);
+			if (in_pszString != NULL)
+			{
+				size_t cChars = wcslen(in_pszString);
+				if (!Write<AkUInt32>((AkUInt32)cChars))
+					return false;
+
+				AkInt32 cWritten = 0;
+				AkInt32 cToWrite = (AkInt32)(cChars * sizeof(wchar_t));
+
+				if (cChars > 0)
+				{
+					WriteBytes(in_pszString, cToWrite, cWritten);
+				}
+
+				return cWritten == cToWrite;
+			}
+			return Write<AkUInt32>(0);
 		}
 
+		/// Writes an ansi string. 
+		/// \return	True if the operation was successful, False otherwise
+		bool WriteString(
+			const char * in_pszString)	///< String to be written
+		{
+			if (in_pszString != NULL)
+			{
+				size_t cChars = strlen(in_pszString);
+				if (!Write<AkUInt32>((AkUInt32)cChars))
+					return false;
+
+				AkInt32 cWritten = 0;
+
+				if (cChars > 0)
+				{
+					WriteBytes(in_pszString, (AkInt32)cChars, cWritten);
+				}
+
+				return cWritten == (AkInt32)cChars;
+			}
+			return Write<AkUInt32>(0);
+		}
 		//@}
 	};
 
