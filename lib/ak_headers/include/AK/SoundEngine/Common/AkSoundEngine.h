@@ -2440,6 +2440,8 @@ namespace AK
 			AkBankType& out_bankType			///< Returned bank type
 			);
 
+		// znix: this seems to be an exact duplicate of the last function?
+		/*
 		/// Loads a bank asynchronously (from in-memory data, out-of-place, any bank type).\n
 		///
 		/// NOTE: Banks loaded from in-memory with out-of-place data must be unloaded using the standard UnloadBank function
@@ -2485,6 +2487,7 @@ namespace AK
 			AkBankID &          out_bankID,				///< Returned bank ID
 			AkBankType &		out_bankType			///< Returned bank type
 			);
+		*/
 
 #ifdef AK_SUPPORT_WCHAR
         /// Unloads a bank synchronously (by Unicode string).\n

@@ -303,6 +303,24 @@ target_include_directories(diesel-wwise-bnk-version-converter PRIVATE lib/diesel
 target_include_directories(diesel-wwise-bnk-version-converter PUBLIC lib/diesel-wwise-bnk-version-converter)
 target_link_libraries(SuperBLT diesel-wwise-bnk-version-converter)
 
+#### WWise bindings ####
+
+# Don't build the bindings automatically as that requires people to install the libclang pypi package
+set(WWISE_BINDING_GEN_C lib/ak_headers/wwise_bindings.gen.cpp)
+#set(WWISE_BINDING_GEN_C "${CMAKE_CURRENT_BINARY_DIR}/wwise_bindings.gen.cpp")
+#add_custom_command(
+#	OUTPUT "${WWISE_BINDING_GEN_C}"
+#	COMMAND ${Python3_EXECUTABLE} lib/ak_headers/generate_bindings.py --output "${WWISE_BINDING_GEN_C}"
+#	MAIN_DEPENDENCY lib/ak_headers/generate_bindings.py
+#	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+#)
+
+add_library(wwise "${WWISE_BINDING_GEN_C}")
+target_include_directories(wwise PUBLIC lib/ak_headers/include)
+
+target_link_libraries(SuperBLT wwise)
+
+
 ###############################################################################
 ## loader binary (this generates a seperate target for both Windows loaders) ##
 ###############################################################################
