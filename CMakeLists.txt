@@ -2,6 +2,16 @@ cmake_minimum_required(VERSION 3.18)
 
 project(SuperBLT CXX C)
 
+# Create a .gitignore file in the build directory, since
+# it saves everyone from having to exclude their build
+# directories.
+# Meson does this by default which is really nice, it'd
+# be great if cmake could do that too.
+if (NOT EXISTS "${CMAKE_BINARY_DIR}/.gitignore")
+	message(STATUS "Creating .gitignore in the binary directory")
+	file(WRITE "${CMAKE_BINARY_DIR}/.gitignore" "*")
+endif ()
+
 ###############################################################################
 ## misc. definitions ##########################################################
 ###############################################################################
