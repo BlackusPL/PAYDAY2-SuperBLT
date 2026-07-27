@@ -15,3 +15,5 @@ bool CheckWwiseSoundbankRequiresConversion(BLTAbstractDataStore* datastore);
 std::vector<uint8_t> ConvertWwiseSoundbank(std::vector<uint8_t>&& data, const std::string& path);
 
 std::vector<uint8_t> ConvertAnimation(std::vector<uint8_t>&& data, const std::string& path);
+
+std::vector<uint8_t> ConvertFont(std::vector<uint8_t>&& data, const std::string& path);

@@ -191,6 +191,12 @@ static void hook_load(try_open_t orig, subhook::Hook& hook, void* this_, Archive
 		// Don't attempt any further format conversion.
 		return;
 	}
+
+	if (*type == blt::idstring_hash("font"))
+	{
+		ConvertData(archive, ConvertFont);
+		return;
+	}
 }
 
 static void setup_extra_asset_hooks()
