@@ -22,7 +22,7 @@ struct AnimationHeader // 32bit, 64bit has extra padding here on purpose
 
 std::vector<uint8_t> ConvertAnimation(std::vector<uint8_t>&& data, const std::string& path)
 {
-	if (data.size() < 4)
+	if (data.size() < sizeof(AnimationHeader))
 		return data;
 
 	if (data[0] == 0x78)
