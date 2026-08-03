@@ -21,12 +21,40 @@ class PDString
 
 	const char* cstr() const
 	{
-		return storage.data;
+		return data();
 	}
 
 	std::string ToCXX() const
 	{
-		return std::string(storage.data, _Mysize);
+		return std::string(cstr(), _Mysize);
+	}
+
+	const char* data() const
+	{
+		if (_Myres > 15)
+			return storage.data;
+		return storage.ssoStorage;
+	}
+	size_t size() const
+	{
+		return _Mysize;
+	}
+
+	const char* begin() const
+	{
+		return data();
+	}
+	const char* end() const
+	{
+		return data() + size();
+	}
+
+	// Use to construct a PDString on the stack, do not store any PDStrings made this way
+	void set_data(char* data, size_t size)
+	{
+		storage.data = data;
+		_Mysize = size;
+		_Myres = size;
 	}
 
   private:

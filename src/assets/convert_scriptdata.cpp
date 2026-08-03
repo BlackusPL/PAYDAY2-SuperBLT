@@ -3,8 +3,9 @@
 //
 
 #include "convert.h"
-
+#include "subhook.h"
 #include "util/util.h"
+#include "dbutil/Archive.h"
 
 #include <diesel/modern/scriptdata.h>
 
@@ -25,13 +26,30 @@ struct ScriptdataHeader
 };
 static_assert(sizeof(ScriptdataHeader) == 192);
 
+struct DslVector32
+{
+	uint32_t allocator;
+	uint32_t padding[3];
+};
+
+struct ScriptdataHeader32
+{
+	DslVector32 numbers;
+	DslVector32 strings;
+	DslVector32 vector3s;
+	DslVector32 quaternions;
+	DslVector32 idstrings;
+	DslVector32 tables;
+};
+static_assert(sizeof(ScriptdataHeader32) == 96);
+
 std::vector<uint8_t> ConvertScriptData(std::vector<uint8_t>&& data, const std::string& path)
 {
 	char msg[100];
 	snprintf(msg, sizeof(msg), "Script data: %d bytes", (int)data.size());
 	RAIDHOOK_LOG_LOG(msg);
 
-	if (data.size() < sizeof(ScriptdataHeader))
+	if (data.size() < sizeof(ScriptdataHeader32))
 		return data;
 
 	ScriptdataHeader* header = (ScriptdataHeader*)data.data();
@@ -41,9 +59,10 @@ std::vector<uint8_t> ConvertScriptData(std::vector<uint8_t>&& data, const std::s
 	// Due to the pointer size differences, it's very likely the allocator pointers (which are null
 	// in the files, and IIRC overwritten with an allocator at load time) will overlap with one of the
 	// pointer/size values in a 32-bit file.
-	if (header->numbers.allocator == nullptr && header->strings.allocator == nullptr &&
+	if (data.size() >= sizeof(ScriptdataHeader) &&
+		(header->numbers.allocator == nullptr && header->strings.allocator == nullptr &&
 	    header->vector3s.allocator == nullptr && header->quaternions.allocator == nullptr &&
-	    header->idstrings.allocator == nullptr && header->tables.allocator == nullptr)
+	    header->idstrings.allocator == nullptr && header->tables.allocator == nullptr))
 	{
 		return data;
 	}
@@ -83,4 +102,28 @@ std::vector<uint8_t> ConvertScriptData(std::vector<uint8_t>&& data, const std::s
 	std::vector<uint8_t> unsignedData = std::move(*aliasingViolationLivesHere);
 
 	return unsignedData;
+}
+
+
+static subhook::Hook ScriptSerializer__from_binary_hook;
+
+void* ScriptSerializer__from_binary_h(void* this_, void* lua_arg_result, const PDString& data, void* metatable_registry)
+{
+	std::vector<uint8_t> to_convert(data.begin(), data.end());
+
+	to_convert = ConvertScriptData(std::move(to_convert), "");
+
+	PDString converted;
+	converted.set_data((char*)to_convert.data(), to_convert.size());
+
+	ScriptSerializer__from_binary_hook.Remove();
+	void* ret = ScriptSerializer__from_binary(this_, lua_arg_result, converted, metatable_registry);
+	ScriptSerializer__from_binary_hook.Install();
+	return ret;
+}
+
+void setup_scriptserializer_hooks()
+{
+	ScriptSerializer__from_binary_hook.Install(ScriptSerializer__from_binary, (void*)&ScriptSerializer__from_binary_h,
+	                                           subhook::HookFlag64BitOffset);
 }

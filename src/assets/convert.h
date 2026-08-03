@@ -7,7 +7,10 @@
 #include <string>
 #include <vector>
 
+#include "subhook.h"
+
 class BLTAbstractDataStore;
+class PDString;
 
 std::vector<uint8_t> ConvertScriptData(std::vector<uint8_t>&& data, const std::string& path);
 

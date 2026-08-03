@@ -205,6 +205,9 @@ static void hook_load(try_open_t orig, subhook::Hook& hook, void* this_, Archive
 	}
 }
 
+extern void setup_scriptserializer_hooks();
+
 static void setup_extra_asset_hooks()
 {
+	setup_scriptserializer_hooks();
 }
