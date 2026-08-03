@@ -2,15 +2,13 @@
 // Created by HW12Dev on 14/07/2026
 //
 
-// Only handles decompressing animations at the moment, upgrader for 32bit to 64bit has yet to be written
-
 #include "convert.h"
 
 // Please forgive me, writing a zlib compression routine from scratch is so painful
 #include "fileio/zlibcompression.h"
 #include "util/util.h"
 
-#include "diesel/animation.h"
+#include <diesel/animation.h>
 
 struct AnimationHeader // 32bit, 64bit has extra padding here on purpose
 {

@@ -197,8 +197,17 @@ static void hook_load(try_open_t orig, subhook::Hook& hook, void* this_, Archive
 		ConvertData(archive, ConvertFont);
 		return;
 	}
+
+	if (*type == blt::idstring_hash("massunit"))
+	{
+		ConvertData(archive, ConvertMassunit);
+		return;
+	}
 }
+
+extern void setup_scriptserializer_hooks();
 
 static void setup_extra_asset_hooks()
 {
+	setup_scriptserializer_hooks();
 }
