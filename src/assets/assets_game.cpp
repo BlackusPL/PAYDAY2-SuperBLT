@@ -106,6 +106,11 @@ static void ConvertData(Archive* archive, const ConversionFn& conversionFn)
 	archive->maybeCompressedSize = 0;
 }
 
+const blt::idstring IDS_BNK = blt::idstring_hash("bnk");
+const blt::idstring IDS_ANIMATION = blt::idstring_hash("animation");
+const blt::idstring IDS_FONT = blt::idstring_hash("font");
+const blt::idstring IDS_MASSUNIT = blt::idstring_hash("massunit");
+
 static void hook_load(try_open_t orig, subhook::Hook& hook, void* this_, Archive* archive, blt::idstring* type,
                       blt::idstring* name, unsigned long long u1, unsigned long long u2)
 {
@@ -151,7 +156,10 @@ static void hook_load(try_open_t orig, subhook::Hook& hook, void* this_, Archive
 		return;
 
 	// Not a file store, or pointing somewhere inside a crate file?
-	if (!IsFileDataStore(archive->datastore) || archive->position)
+	// HW12Dev: Checking for a filedatastore here means that files that got cached by DB and put into a ConstMemoryDataStore because it is currently loading streaming resources.
+	// either dont check filedatastore, check if it was cached or check if the archive matches the name "@IDxxxxxxxxxxxxxxxx@.@IDxxxxxxxxxxxxxxxx@" (pretty sure nothing else follows that naming scheme for archives)
+	//if (!IsFileDataStore(archive->datastore) || archive->position)
+	if (archive->position)
 		return;
 
 	// This is a file loaded from an external file. Depending on the type, inject our converter.
@@ -168,7 +176,7 @@ static void hook_load(try_open_t orig, subhook::Hook& hook, void* this_, Archive
 		return;
 	}
 
-	if (*type == blt::idstring_hash("bnk"))
+	if (*type == IDS_BNK)
 	{
 		// The soundbanks can be quite big, so it's probably best not to load them into memory
 		// immediately ourselves if they're already 64-bit.
@@ -182,7 +190,7 @@ static void hook_load(try_open_t orig, subhook::Hook& hook, void* this_, Archive
 		return;
 	}
 
-	if(*type == blt::idstring_hash("animation"))
+	if(*type == IDS_ANIMATION)
 	{
 		// HW12Dev: It's okay to read them all and decompress them from crates anyways, the memory usage is the same either way
 
@@ -192,13 +200,13 @@ static void hook_load(try_open_t orig, subhook::Hook& hook, void* this_, Archive
 		return;
 	}
 
-	if (*type == blt::idstring_hash("font"))
+	if (*type == IDS_FONT)
 	{
 		ConvertData(archive, ConvertFont);
 		return;
 	}
 
-	if (*type == blt::idstring_hash("massunit"))
+	if (*type == IDS_MASSUNIT)
 	{
 		ConvertData(archive, ConvertMassunit);
 		return;
