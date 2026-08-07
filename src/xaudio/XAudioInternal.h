@@ -11,6 +11,10 @@
 #include "lua.h"
 #include "util/util.h"
 
+#include <al/al.h>
+#include <al/alc.h>
+#include <al/alext.h>
+
 using namespace std;
 
 #define WORLD_VEC_CUSTOMSCALE(scale, L, ix, iy, iz) \
@@ -20,16 +24,15 @@ using namespace std;
 #define XAERR(str)                                                                        \
 	luaL_error(L, "XAudio Error at %s:%d : %s", __FILE__, __LINE__, string(str).c_str()); \
 	throw "luaL_error returned."
-/*
 #define ALERR { \
-    if(!xaudio::is_setup) PD2HOOK_LOG_WARN("XAudio Warning: blt.xaudio.setup() has not been called!"); \
+    if(!xaudio::is_setup) RAIDHOOK_LOG_WARN("XAudio Warning: blt.xaudio.setup() has not been called!"); \
     ALenum error; \
     if ((error = alGetError()) != AL_NO_ERROR) { \
         XAERR("alErr : " + to_string(error)); \
     } \
-}*/
+}
 
-#define ALERR
+//#define ALERR
 
 #define XA_CLASS_LUA_METHOD_DEC(klass, method) int klass##_##method(lua_State* L);
 

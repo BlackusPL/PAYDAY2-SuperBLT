@@ -45,9 +45,11 @@ static_assert(sizeof(ScriptdataHeader32) == 96);
 
 std::vector<uint8_t> ConvertScriptData(std::vector<uint8_t>&& data, const std::string& path)
 {
+	/*
 	char msg[100];
 	snprintf(msg, sizeof(msg), "Script data: %d bytes", (int)data.size());
 	RAIDHOOK_LOG_LOG(msg);
+	*/
 
 	if (data.size() < sizeof(ScriptdataHeader32))
 		return data;

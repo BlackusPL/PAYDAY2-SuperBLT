@@ -1025,7 +1025,7 @@ namespace blt
 			lua_pop(L, 1); // pop the BLT library
 
 #ifdef ENABLE_XAUDIO
-			xaudio::XAudio::Register(L);
+			sblt::XAudio::Register(L);
 #endif
 
 			for (plugins::Plugin* plugin : plugins::GetPlugins())

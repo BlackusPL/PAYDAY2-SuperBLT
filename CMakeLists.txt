@@ -27,6 +27,9 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Enable XAudio
+add_definitions(-DENABLE_XAUDIO)
+
 # find python3
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
@@ -251,6 +254,16 @@ set(ZLIB_INCLUDE_DIR ${zlib_SOURCE_DIR} CACHE INTERNAL "")
 target_link_libraries(SuperBLT zlib-ng)
 
 
+
+# Unfortunately cmake doesn't have namespacing, so we have to set stuff here
+set(LIBTYPE STATIC)
+set(ALSOFT_INSTALL OFF)
+set(ALSOFT_INSTALL_CONFIG OFF)
+set(ALSOFT_INSTALL_HRTF_DATA OFF)
+set(ALSOFT_INSTALL_AMBDEC_PRESETS OFF)
+add_subdirectory(lib/sys/openalsoft EXCLUDE_FROM_ALL)
+target_link_libraries(OpenAL PRIVATE winmm.lib) # Not set up by default?
+target_link_libraries(SuperBLT OpenAL)
 
 #### CURL ####
 

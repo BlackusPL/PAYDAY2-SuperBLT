@@ -28,3 +28,6 @@
 [submodule "lib/diesel-wwise-bnk-version-converter"]
 	path = lib/diesel-wwise-bnk-version-converter
 	url = https://github.com/Javgarag/diesel-wwise-bnk-version-converter.git
+[submodule "lib/sys/openalsoft"]
+	path = lib/sys/openalsoft
+	url = https://github.com/kcat/openal-soft
