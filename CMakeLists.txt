@@ -152,6 +152,18 @@ target_include_directories(SuperBLT PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/gen)
 set_property(TARGET SuperBLT PROPERTY OUTPUT_NAME WSOCK32)
 target_include_directories(SuperBLT PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/loader")
 
+# Set up the automatic version number embedding
+# This only updates the header if it's contents has changed, so it won't recompile
+# anything unless necessary.
+set(gen_version_dir "${CMAKE_CURRENT_BINARY_DIR}/gen_version")
+set(gen_version_header "${gen_version_dir}/version.gen.h")
+add_custom_target(generate_version_header
+    BYPRODUCTS "${gen_version_header}"
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/src/util/git_version.py" --out "${gen_version_header}"
+)
+target_sources(SuperBLT PRIVATE "${gen_version_header}")
+target_include_directories(SuperBLT PRIVATE "${gen_version_dir}")
+
 ###############################################################################
 ## dependencies ###############################################################
 ###############################################################################

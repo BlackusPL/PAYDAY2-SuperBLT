@@ -258,6 +258,8 @@ namespace blt
 {
 	idstring idstring_hash(const std::string& text);
 
+	extern const char *SBLT_VERSION;
+
 	// Thank you, Raymond Chen
 	// https://devblogs.microsoft.com/oldnewthing/20041025-00/?p=37483
 	EXTERN_C IMAGE_DOS_HEADER __ImageBase; // NOLINT(*-reserved-identifier)
