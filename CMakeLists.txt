@@ -128,6 +128,7 @@ target_compile_options(SuperBLT PRIVATE
 	-DCURL_STATICLIB
 	-DSUBHOOK_STATIC
 	-DWIN32_LEAN_AND_MEAN
+	-DNOMINMAX # Make std::min and std::max usable
 )
 
 # General optimisation breaks calls to certain lua functions, so replace it.
