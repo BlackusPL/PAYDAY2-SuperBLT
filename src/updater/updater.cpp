@@ -45,15 +45,15 @@ static int64_t GetTimestamp(); // ms since 1/1/1601
 static UpdateCheckCacheState ReadCachedUpdateState();
 static std::optional<UpdateCheckInfo> ReadUpdateCheckInfo();
 static bool VerifySignature(const uint8_t* data, size_t dataSize, const uint8_t* signature, size_t signatureSize);
+static path GetGameDir();
 
 extern "C" __declspec(dllexport) void CALLBACK RUNDLL_DoUpdateCheck(HWND hwnd, HINSTANCE hinst, LPSTR lpszCmdLine,
                                                                     int nCmdShow)
 {
-	std::string dllFilename = Util::GetModuleFileNameCxx(blt::THIS_COMPONENT);
-	path dllPath = dllFilename;
-	path gameDir = dllPath.parent_path();
+	path gameDir = GetGameDir();
 
-	blt::platform::win32::OpenConsole();
+	if (Util::GetFileType("mods/developer.txt") != Util::FileType::FileType_None)
+		blt::platform::win32::OpenConsole();
 
 	printf("SuperBLT Update Checker\n");
 	printf("Using game directory: '%s'\n", gameDir.string().c_str());
@@ -83,14 +83,20 @@ extern "C" __declspec(dllexport) void CALLBACK RUNDLL_DoUpdateCheck(HWND hwnd, H
 	mxmlAdd(tree, MXML_ADD_AFTER, nullptr, root);
 
 	const char* s = mxmlSaveAllocString(tree, nullptr);
-	printf("XML: %s\n", s);
+	// printf("XML: %s\n", s);
 
-	// Sleep(3000);
+	{
+		std::ofstream f(gameDir / LAST_UPDATE_PATH, std::ios::binary);
+		f.write(s, strlen(s));
+	}
+
+	free((void*)s);
 }
 
 extern "C" __declspec(dllexport) void CALLBACK RUNDLL_InstallUpdate(HWND hwnd, HINSTANCE hinst, LPSTR lpszCmdLine,
                                                                     int nCmdShow)
 {
+	// Always show the console during updates, so we can give the user some feedback
 	blt::platform::win32::OpenConsole();
 	printf("SuperBLT DLL Updater\n");
 
@@ -189,6 +195,11 @@ extern "C" __declspec(dllexport) void CALLBACK RUNDLL_InstallUpdate(HWND hwnd, H
 		printErrorAndExit();
 	}
 
+	// The .old DLL is left sitting around until the next update, but that really doesn't matter - it
+	// might be of some help with rolling back updates or whatever, and uses a negligible amount of space.
+	// The separate EXE-based update system that RAID BLT uses deletes these files on startup, and we
+	// could very easily do that if we wanted to here.
+
 	printf("Update completed successfully!\n");
 	printf("(press enter to continue)\n");
 	getc(stdin);
@@ -229,8 +240,8 @@ static int DownloadUrlToString(const char* url, std::string& outVersion)
 
 static std::optional<UpdateCheckInfo> ReadUpdateCheckInfo()
 {
-	// FIXME use game relative path
-	FILE* fp = fopen(LAST_UPDATE_PATH, "r");
+	std::string updatePath = (GetGameDir() / LAST_UPDATE_PATH).string();
+	FILE* fp = fopen(updatePath.c_str(), "r");
 	if (!fp)
 	{
 		return std::nullopt;
@@ -343,6 +354,10 @@ static bool RunUpdateProcess(std::string commandLine, const std::string& startDi
 
 void raidhook::CheckForUpdates()
 {
+	// This would get *really* annoying if you're working on the DLL
+	if (Util::GetFileType("mods/disable dll updates.txt") != Util::FileType::FileType_None)
+		return;
+
 	// Have we already checked recently?
 	// This will avoid wasting the user's time if they're repeatedly re-launching the game
 	// and have slow internet.
@@ -410,7 +425,7 @@ void raidhook::CheckForUpdates()
 	}
 }
 
-bool VerifySignature(const uint8_t* data, size_t dataSize, const uint8_t* signature, size_t signatureSize)
+static bool VerifySignature(const uint8_t* data, size_t dataSize, const uint8_t* signature, size_t signatureSize)
 {
 	static_assert(sizeof(TESTING_PUBKEY) == MLDSA65_PUBLICKEYBYTES);
 	static_assert(sizeof(PRODUCTION_PUBKEY) == MLDSA65_PUBLICKEYBYTES);
@@ -421,4 +436,12 @@ bool VerifySignature(const uint8_t* data, size_t dataSize, const uint8_t* signat
 	int result = PQCP_MLDSA_NATIVE_MLDSA65_verify(signature, data, dataSize, nullptr, 0, PRODUCTION_PUBKEY);
 
 	return result == 0;
+}
+
+static path GetGameDir()
+{
+	std::string dllFilename = Util::GetModuleFileNameCxx(blt::THIS_COMPONENT);
+	path dllPath = dllFilename;
+	path gameDir = dllPath.parent_path();
+	return gameDir;
 }

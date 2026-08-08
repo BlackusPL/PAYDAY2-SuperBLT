@@ -3,16 +3,15 @@
 #include "assets/assets.h"
 #include "console/console.h"
 #include "signatures/signatures.h"
-#include <util/util.h>
+#include "updater/updater.h"
+#include "util/util.h"
 
+#include <Windows.h>
 #include <filesystem>
 #include <format>
 #include <fstream>
 #include <stdlib.h>
 #include <string>
-
-#define WIN32_LEAN_AND_MEAN 1
-#include <Windows.h>
 
 using namespace std;
 using namespace raidhook;
@@ -51,44 +50,7 @@ void blt::platform::InitPlatform()
 	}
 
 	// run external dll updater
-	// needs to be external because we are still in LoaderLock which blocks network I/O
-	if (std::filesystem::exists("updater/SBLT_DLL_UPDATER.exe"))
-	{
-		SetCurrentDirectory("updater");
-		int ret = system(std::format("SBLT_DLL_UPDATER.exe {}", blt::SBLT_VERSION).c_str());
-		SetCurrentDirectory("..");
-		if (ret == 1) // updater downloaded new dll version
-		{
-			if (std::filesystem::exists("IPHLPAPI.dll") and !std::filesystem::exists("WSOCK32.dll"))
-			{
-				if (MoveFileEx("IPHLPAPI.dll", "IPHLPAPI.dll.old", MOVEFILE_REPLACE_EXISTING) == 0)
-				{
-					MessageBox(0, std::format("Error: {}", GetLastError()).c_str(), "SBLT DLL Downloader", MB_OK);
-				}
-				if (MoveFileEx("updater/IPHLPAPI.dll", "IPHLPAPI.dll", MOVEFILE_REPLACE_EXISTING) == 0)
-				{
-					MessageBox(0, std::format("Error: {}", GetLastError()).c_str(), "SBLT DLL Downloader", MB_OK);
-				}
-			}
-			if (std::filesystem::exists("WSOCK32.dll") and !std::filesystem::exists("IPHLPAPI.dll"))
-			{
-				if (MoveFileEx("WSOCK32.dll", "WSOCK32.dll.old", MOVEFILE_REPLACE_EXISTING) == 0)
-				{
-					MessageBox(0, std::format("Error: {}", GetLastError()).c_str(), "SBLT DLL Downloader", MB_OK);
-				}
-				if (MoveFileEx("updater/WSOCK32.dll", "WSOCK32.dll", MOVEFILE_REPLACE_EXISTING) == 0)
-				{
-					MessageBox(0, std::format("Error: {}", GetLastError()).c_str(), "SBLT DLL Downloader", MB_OK);
-				}
-			}
-
-			exit(0);
-		}
-		if (ret == 3) // updater self updated
-		{
-			exit(0);
-		}
-	}
+	CheckForUpdates();
 
 	if (!SignatureSearch::Search())
 	{
