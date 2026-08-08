@@ -158,6 +158,8 @@ namespace raidhook
 				}
 
 				mOut << msg << mEndl;
+
+				mOut.flush();
 			}
 		} // namespace
 

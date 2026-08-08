@@ -7,7 +7,7 @@
 
 namespace sblt
 {
-	using namespace pd2hook::xaudio;
+	using namespace sblt::xaudio;
 
 	static void set_vector_property(lua_State* L, ALenum type)
 	{

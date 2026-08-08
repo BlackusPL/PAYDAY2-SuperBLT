@@ -2,6 +2,9 @@
 
 #ifdef ENABLE_XAUDIO
 
+struct ALCdevice;
+struct ALCcontext;
+
 namespace sblt
 {
 
@@ -16,6 +19,9 @@ namespace sblt
 	  private:
 		XAudio();
 		~XAudio();
+
+		ALCdevice* dev;
+		ALCcontext* ctx;
 	};
 
 }; // namespace sblt

@@ -9,6 +9,8 @@
 //
 #include "winres.h"
 
+#include "version.gen.h"
+
 /////////////////////////////////////////////////////////////////////////////
 #undef APSTUDIO_READONLY_SYMBOLS
 
@@ -68,12 +70,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "RAID-SuperBLT"
             VALUE "FileDescription", "RAID-SuperBLT"
-            VALUE "FileVersion", "1.1.1.0"
+            VALUE "FileVersion", SUPERBLT_VERSION_MACRO
             VALUE "InternalName", "RAID-SuperBLT.dll"
             VALUE "LegalCopyright", "Copyright (C) 2026"
             VALUE "OriginalFilename", "RAID-SuperBLT.dll"
             VALUE "ProductName", "RAID-SuperBLT"
-            VALUE "ProductVersion", "1.1.1.0"
+            VALUE "ProductVersion", SUPERBLT_VERSION_MACRO
         END
     END
     BLOCK "VarFileInfo"

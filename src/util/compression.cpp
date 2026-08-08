@@ -7,10 +7,11 @@
 #include <fstream>
 #include <list>
 #include <memory>
+#include <spanstream>
 
 namespace raidhook
 {
-	namespace
+	namespace Zip
 	{
 		const int32_t MagicFileHeader = 0x04034b50;
 
@@ -19,40 +20,34 @@ namespace raidhook
 		class ByteStream
 		{
 		  public:
-			ByteStream(const std::string& path);
+			ByteStream(std::istream* stream) : mainStream(stream) {};
 
 			template <typename T> T readType();
 			std::string readString(int length);
 
 		  private:
-			std::ifstream mainStream;
+			std::istream* mainStream;
 		};
-
-		struct ZIPFileData
-		{
-			std::string filepath;
-			std::string decompressedData;
-			int compressedSize;
-			int uncompressedSize;
-		};
-
-		ByteStream::ByteStream(const std::string& path) : mainStream(path.c_str(), std::ifstream::binary)
-		{
-		}
 
 		template <typename T> T ByteStream::readType()
 		{
 			T read;
+			ZeroMemory(&read, sizeof(T));
 
-			mainStream.read(reinterpret_cast<char*>(&read), sizeof(T));
+			mainStream->read(reinterpret_cast<char*>(&read), sizeof(T));
 			return read;
 		}
 
 		std::string ByteStream::readString(int length)
 		{
-			std::unique_ptr<char[]> readData(new char[length + 1]);
-			mainStream.read(readData.get(), length);
-			return std::string(readData.get(), length);
+			// Convert length to an unsigned value first, so it can't be interpreted different ways.
+			// Also block overflows if this code gets reused on a 32-bit system.
+			size_t clampedLen = std::min<size_t>(length, 0xffffffff - 1);
+
+			std::unique_ptr<char[]> readData(new char[clampedLen + 1]);
+			ZeroMemory(readData.get(), clampedLen + 1); // If read() hits EOF early, zero everything it didn't read.
+			mainStream->read(readData.get(), clampedLen);
+			return std::string(readData.get(), clampedLen);
 		}
 
 		std::string DecompressData(const DataPair_t& compressedData)
@@ -70,15 +65,20 @@ namespace raidhook
 			stream.avail_in = compressedData.second.size();
 			stream.next_in = reinterpret_cast<unsigned char*>(const_cast<char*>(compressedData.second.data()));
 
-			std::unique_ptr<unsigned char[]> out(new unsigned char[compressedData.first + 1]);
+			// Convert length to an unsigned value first, so it can't be interpreted different ways.
+			// Also block overflows if this code gets reused on a 32-bit system.
+			size_t uncompressedSize = std::min<size_t>(compressedData.first, 0xffffffff - 1);
 
-			stream.avail_out = compressedData.first;
+			std::unique_ptr<unsigned char[]> out(new unsigned char[uncompressedSize + 1]);
+			ZeroMemory(out.get(), uncompressedSize + 1); // If decompression fails, don't output uninitialised memory
+
+			stream.avail_out = uncompressedSize;
 			stream.next_out = out.get();
 
 			inflate(&stream, Z_NO_FLUSH);
 			inflateEnd(&stream);
 
-			return std::string(reinterpret_cast<const char*>(out.get()), compressedData.first);
+			return std::string(reinterpret_cast<const char*>(out.get()), uncompressedSize);
 		}
 
 		std::unique_ptr<ZIPFileData> ReadFile(ByteStream& mainStream)
@@ -128,6 +128,22 @@ namespace raidhook
 			return newFile;
 		}
 
+		std::vector<std::unique_ptr<ZIPFileData>> ReadZipFile(const uint8_t* data, size_t size)
+		{
+			std::ispanstream stream{std::span((const char*)data, size)};
+			ByteStream mainStream(&stream);
+
+			std::vector<std::unique_ptr<ZIPFileData>> files;
+			{
+				std::unique_ptr<ZIPFileData> file;
+				while ((file = ReadFile(mainStream)))
+				{
+					files.push_back(std::move(file));
+				}
+			}
+			return files;
+		}
+
 		bool WriteFile(const std::string& extractPath, const ZIPFileData& data)
 		{
 			const std::string finalWritePath = extractPath + "/" + data.filepath;
@@ -151,19 +167,20 @@ namespace raidhook
 					return false;
 				}
 
-				outFile.write(data.decompressedData.data(), data.uncompressedSize);
+				outFile.write(data.decompressedData.data(), data.decompressedData.size());
 				return true;
 			}
 		}
-	} // namespace
+	} // namespace Zip
 
 	bool ExtractZIPArchive(const std::string& path, const std::string& extractPath)
 	{
-		ByteStream mainStream(path);
+		std::ifstream fileStream(path, std::ifstream::binary);
+		Zip::ByteStream mainStream(&fileStream);
 
-		std::list<std::unique_ptr<ZIPFileData>> files;
+		std::list<std::unique_ptr<Zip::ZIPFileData>> files;
 		{
-			std::unique_ptr<ZIPFileData> file;
+			std::unique_ptr<Zip::ZIPFileData> file;
 			while ((file = ReadFile(mainStream)))
 			{
 				files.push_back(std::move(file));
@@ -172,7 +189,8 @@ namespace raidhook
 
 		RAIDHOOK_LOG_LOG(std::string("Extracting ") + path + std::string(" to ") + extractPath);
 		bool result = true;
-		std::for_each(files.cbegin(), files.cend(), [extractPath, &result](const std::unique_ptr<ZIPFileData>& data)
+		std::for_each(files.cbegin(), files.cend(),
+		              [extractPath, &result](const std::unique_ptr<Zip::ZIPFileData>& data)
 		              { result &= WriteFile(extractPath, *data); });
 		return result;
 	}

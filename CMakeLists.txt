@@ -27,6 +27,9 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Enable XAudio
+add_definitions(-DENABLE_XAUDIO)
+
 # find python3
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
@@ -92,16 +95,40 @@ add_custom_command(
 )
 list(APPEND sources ${CMAKE_CURRENT_BINARY_DIR}/wren_generated_src.c)
 
+
+###############################################################################
+## loader binary stuff ########################################################
+###############################################################################
+
+
+set(LOADER_GEN_ASM "${CMAKE_CURRENT_BINARY_DIR}/loader/loader_asm.gen.asm")
+set(LOADER_GEN_H "${CMAKE_CURRENT_BINARY_DIR}/loader/loader_asm.gen.h")
+set(LOADER_GEN_DEF "${CMAKE_CURRENT_BINARY_DIR}/loader/loader_asm.gen.def")
+add_custom_command(
+	OUTPUT "${LOADER_GEN_ASM}" "${LOADER_GEN_H}" "${LOADER_GEN_DEF}"
+	COMMAND ${Python3_EXECUTABLE} loader/generate_asm.py --asm "${LOADER_GEN_ASM}" --header "${LOADER_GEN_H}" --def "${LOADER_GEN_DEF}"
+	MAIN_DEPENDENCY loader/generate_asm.py
+	DEPENDS loader/iphp.def loader/wsock.def
+	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+	VERBATIM
+)
+
+list(APPEND sources loader/loader.cpp loader/loader_manual_asm.asm src/Resource.rc "${LOADER_GEN_ASM}" "${LOADER_GEN_DEF}")
+
+set_property(SOURCE loader/loader.asm PROPERTY LANGUAGE ASM_MASM)
+set_property(SOURCE "${LOADER_GEN_ASM}" PROPERTY LANGUAGE ASM_MASM)
+
 ###############################################################################
 ## Base (non-platform-specific) part of SuperBLT ##############################
 ###############################################################################
 
-add_library(SuperBLT STATIC ${sources})
+add_library(SuperBLT SHARED ${sources})
 
 target_compile_options(SuperBLT PRIVATE
 	-DCURL_STATICLIB
 	-DSUBHOOK_STATIC
 	-DWIN32_LEAN_AND_MEAN
+	-DNOMINMAX # Make std::min and std::max usable
 )
 
 # General optimisation breaks calls to certain lua functions, so replace it.
@@ -115,11 +142,27 @@ endforeach(flag_var)
 # Link against libraries
 target_link_libraries(SuperBLT crypt32.lib ws2_32.lib version.lib)
 
-# Allow both SuperBLT and the loaders access to the headers
+# Allow SuperBLT to access the headers
 target_include_directories(SuperBLT PUBLIC src)
 
 # Make the generated wren header available
 target_include_directories(SuperBLT PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/gen)
+
+# Set up the loader-related stuff
+set_property(TARGET SuperBLT PROPERTY OUTPUT_NAME WSOCK32)
+target_include_directories(SuperBLT PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/loader")
+
+# Set up the automatic version number embedding
+# This only updates the header if it's contents has changed, so it won't recompile
+# anything unless necessary.
+set(gen_version_dir "${CMAKE_CURRENT_BINARY_DIR}/gen_version")
+set(gen_version_header "${gen_version_dir}/version.gen.h")
+add_custom_target(generate_version_header
+    BYPRODUCTS "${gen_version_header}"
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/src/util/git_version.py" --out "${gen_version_header}"
+)
+target_sources(SuperBLT PRIVATE "${gen_version_header}")
+target_include_directories(SuperBLT PRIVATE "${gen_version_dir}")
 
 ###############################################################################
 ## dependencies ###############################################################
@@ -252,6 +295,16 @@ target_link_libraries(SuperBLT zlib-ng)
 
 
 
+# Unfortunately cmake doesn't have namespacing, so we have to set stuff here
+set(LIBTYPE STATIC)
+set(ALSOFT_INSTALL OFF)
+set(ALSOFT_INSTALL_CONFIG OFF)
+set(ALSOFT_INSTALL_HRTF_DATA OFF)
+set(ALSOFT_INSTALL_AMBDEC_PRESETS OFF)
+add_subdirectory(lib/sys/openalsoft EXCLUDE_FROM_ALL)
+target_link_libraries(OpenAL PRIVATE winmm.lib) # Not set up by default?
+target_link_libraries(SuperBLT OpenAL)
+
 #### CURL ####
 
 # Use Windows SSPI for HTTPS
@@ -331,31 +384,30 @@ target_include_directories(wwise PUBLIC lib/ak_headers/include)
 
 target_link_libraries(SuperBLT wwise)
 
+### cJSON ###
 
-###############################################################################
-## loader binary (this generates a seperate target for both Windows loaders) ##
-###############################################################################
-
-set(LOADER_GEN_ASM "${CMAKE_CURRENT_BINARY_DIR}/loader/loader_asm.gen.asm")
-set(LOADER_GEN_H "${CMAKE_CURRENT_BINARY_DIR}/loader/loader_asm.gen.h")
-set(LOADER_GEN_DEF "${CMAKE_CURRENT_BINARY_DIR}/loader/loader_asm.gen.def")
-add_custom_command(
-	OUTPUT "${LOADER_GEN_ASM}" "${LOADER_GEN_H}" "${LOADER_GEN_DEF}"
-	COMMAND ${Python3_EXECUTABLE} loader/generate_asm.py --asm "${LOADER_GEN_ASM}" --header "${LOADER_GEN_H}" --def "${LOADER_GEN_DEF}"
-	MAIN_DEPENDENCY loader/generate_asm.py
-	DEPENDS loader/iphp.def loader/wsock.def
-	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-	VERBATIM
+add_library(cJSON STATIC
+	lib/cJSON/cJSON.c
+	lib/cJSON/cJSON_Utils.c
 )
+target_include_directories(cJSON PUBLIC lib/cJSON)
 
-add_library(WSOCK32 SHARED loader/loader.cpp loader/loader_manual_asm.asm src/Resource.rc "${LOADER_GEN_ASM}" "${LOADER_GEN_DEF}")
-target_link_libraries(WSOCK32 LINK_PRIVATE SuperBLT)
-target_include_directories(WSOCK32 PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/loader")
+target_link_libraries(SuperBLT cJSON)
 
-set_property(SOURCE loader/loader.asm PROPERTY LANGUAGE ASM_MASM)
-set_property(SOURCE "${LOADER_GEN_ASM}" PROPERTY LANGUAGE ASM_MASM)
 
-target_compile_options(WSOCK32 PRIVATE -DBLT_USE_WSOCK)
+# mldsa_native
+
+# We're using the C arithmatic backend. While I'd normally be pretty wary of this
+# due to the (albeit quite small due to ML-DSA's design) chance of timing sidechannel
+# attacks from a sufficiently smart C compiler, here we're only using the signature
+# verification API.
+add_library(mldsa_native STATIC
+	lib/mldsa-native/mldsa/mldsa_native.c
+)
+target_include_directories(mldsa_native PUBLIC lib/mldsa-native)
+
+target_link_libraries(SuperBLT mldsa_native)
+
 
 ###############################################################################
 ## build external updater for dll                                            ##

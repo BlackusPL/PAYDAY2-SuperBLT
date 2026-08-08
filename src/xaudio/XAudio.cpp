@@ -86,7 +86,7 @@ namespace sblt
 		}
 		catch (string msg)
 		{
-			PD2HOOK_LOG_ERROR("Exception while loading XAudio API: " + msg);
+			RAIDHOOK_LOG_ERROR("Exception while loading XAudio API: " + msg);
 			lua_pushboolean(L, false);
 			return 1;
 		}
@@ -140,12 +140,12 @@ namespace sblt
 
 		alDistanceModel(AL_LINEAR_DISTANCE_CLAMPED);
 
-		PD2HOOK_LOG_LOG("Loaded OpenAL XAudio API");
+		RAIDHOOK_LOG_LOG("Loaded OpenAL XAudio API");
 	}
 
 	XAudio::~XAudio()
 	{
-		PD2HOOK_LOG_LOG("Closing OpenAL XAudio API");
+		RAIDHOOK_LOG_LOG("Closing OpenAL XAudio API");
 
 		// Delete all sources
 		reset_cleanup();
