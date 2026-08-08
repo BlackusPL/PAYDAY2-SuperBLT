@@ -2,8 +2,13 @@
 /.vs
 /out
 
+# IDEA files
+/.idea
+
 # Swap files
 .*.swp
 
 # tmp file
 /src/Resource.aps
+__pycache__
+

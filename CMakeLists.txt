@@ -95,11 +95,34 @@ add_custom_command(
 )
 list(APPEND sources ${CMAKE_CURRENT_BINARY_DIR}/wren_generated_src.c)
 
+
+###############################################################################
+## loader binary stuff ########################################################
+###############################################################################
+
+
+set(LOADER_GEN_ASM "${CMAKE_CURRENT_BINARY_DIR}/loader/loader_asm.gen.asm")
+set(LOADER_GEN_H "${CMAKE_CURRENT_BINARY_DIR}/loader/loader_asm.gen.h")
+set(LOADER_GEN_DEF "${CMAKE_CURRENT_BINARY_DIR}/loader/loader_asm.gen.def")
+add_custom_command(
+	OUTPUT "${LOADER_GEN_ASM}" "${LOADER_GEN_H}" "${LOADER_GEN_DEF}"
+	COMMAND ${Python3_EXECUTABLE} loader/generate_asm.py --asm "${LOADER_GEN_ASM}" --header "${LOADER_GEN_H}" --def "${LOADER_GEN_DEF}"
+	MAIN_DEPENDENCY loader/generate_asm.py
+	DEPENDS loader/iphp.def loader/wsock.def
+	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+	VERBATIM
+)
+
+list(APPEND sources loader/loader.cpp loader/loader_manual_asm.asm src/Resource.rc "${LOADER_GEN_ASM}" "${LOADER_GEN_DEF}")
+
+set_property(SOURCE loader/loader.asm PROPERTY LANGUAGE ASM_MASM)
+set_property(SOURCE "${LOADER_GEN_ASM}" PROPERTY LANGUAGE ASM_MASM)
+
 ###############################################################################
 ## Base (non-platform-specific) part of SuperBLT ##############################
 ###############################################################################
 
-add_library(SuperBLT STATIC ${sources})
+add_library(SuperBLT SHARED ${sources})
 
 target_compile_options(SuperBLT PRIVATE
 	-DCURL_STATICLIB
@@ -118,11 +141,15 @@ endforeach(flag_var)
 # Link against libraries
 target_link_libraries(SuperBLT crypt32.lib ws2_32.lib version.lib)
 
-# Allow both SuperBLT and the loaders access to the headers
+# Allow SuperBLT to access the headers
 target_include_directories(SuperBLT PUBLIC src)
 
 # Make the generated wren header available
 target_include_directories(SuperBLT PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/gen)
+
+# Set up the loader-related stuff
+set_property(TARGET SuperBLT PROPERTY OUTPUT_NAME WSOCK32)
+target_include_directories(SuperBLT PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/loader")
 
 ###############################################################################
 ## dependencies ###############################################################
@@ -344,31 +371,6 @@ target_include_directories(wwise PUBLIC lib/ak_headers/include)
 
 target_link_libraries(SuperBLT wwise)
 
-
-###############################################################################
-## loader binary (this generates a seperate target for both Windows loaders) ##
-###############################################################################
-
-set(LOADER_GEN_ASM "${CMAKE_CURRENT_BINARY_DIR}/loader/loader_asm.gen.asm")
-set(LOADER_GEN_H "${CMAKE_CURRENT_BINARY_DIR}/loader/loader_asm.gen.h")
-set(LOADER_GEN_DEF "${CMAKE_CURRENT_BINARY_DIR}/loader/loader_asm.gen.def")
-add_custom_command(
-	OUTPUT "${LOADER_GEN_ASM}" "${LOADER_GEN_H}" "${LOADER_GEN_DEF}"
-	COMMAND ${Python3_EXECUTABLE} loader/generate_asm.py --asm "${LOADER_GEN_ASM}" --header "${LOADER_GEN_H}" --def "${LOADER_GEN_DEF}"
-	MAIN_DEPENDENCY loader/generate_asm.py
-	DEPENDS loader/iphp.def loader/wsock.def
-	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-	VERBATIM
-)
-
-add_library(WSOCK32 SHARED loader/loader.cpp loader/loader_manual_asm.asm src/Resource.rc "${LOADER_GEN_ASM}" "${LOADER_GEN_DEF}")
-target_link_libraries(WSOCK32 LINK_PRIVATE SuperBLT)
-target_include_directories(WSOCK32 PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/loader")
-
-set_property(SOURCE loader/loader.asm PROPERTY LANGUAGE ASM_MASM)
-set_property(SOURCE "${LOADER_GEN_ASM}" PROPERTY LANGUAGE ASM_MASM)
-
-target_compile_options(WSOCK32 PRIVATE -DBLT_USE_WSOCK)
 
 ###############################################################################
 ## build external updater for dll                                            ##
