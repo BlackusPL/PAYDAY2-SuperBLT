@@ -37,7 +37,6 @@ namespace raidhook
 		std::string GetDirectoryHash(std::string directory);
 		std::string GetFileHash(std::string filename);
 		bool MoveDirectory(const std::string& path, const std::string& destination);
-		std::string GetDllVersion();
 
 		template <typename T> std::string ToHex(T num);
 		std::string StripWhitespace(std::string s);

@@ -743,62 +743,7 @@ namespace raidhook
 
 	static int luaF_blt_version(lua_State* L)
 	{
-		HMODULE hModule;
-		GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, (LPCTSTR)luaF_blt_version, &hModule);
-		char path[MAX_PATH + 1];
-		size_t pathSize = GetModuleFileName(hModule, path, sizeof(path) - 1);
-		path[pathSize] = '\0';
-
-		DWORD verHandle = 0;
-		UINT size = 0;
-		LPBYTE lpBuffer = NULL;
-		uint32_t verSize = GetFileVersionInfoSize(path, &verHandle);
-
-		if (verSize == 0)
-		{
-			RAIDHOOK_LOG_ERROR(
-				std::format("Error occurred while calling 'GetFileVersionInfoSize': {}", GetLastError()));
-			lua_pushstring(L, "0.0.0.0");
-			return 1;
-		}
-
-		std::string verData;
-		verData.resize(verSize);
-
-		if (!GetFileVersionInfo(path, verHandle, verSize, verData.data()))
-		{
-			RAIDHOOK_LOG_ERROR(std::format("Error occurred while calling 'GetFileVersionInfo': {}", GetLastError()));
-			lua_pushstring(L, "0.0.0.0");
-			return 1;
-		}
-
-		if (!VerQueryValue(verData.data(), "\\", (VOID FAR * FAR*)&lpBuffer, &size))
-		{
-			RAIDHOOK_LOG_ERROR(std::format("Error occurred while calling 'VerQueryValue': {}", GetLastError()));
-			lua_pushstring(L, "0.0.0.0");
-			return 1;
-		}
-
-		if (size == 0)
-		{
-			RAIDHOOK_LOG_ERROR("Invalid version value buffer Size");
-			lua_pushstring(L, "0.0.0.0");
-			return 1;
-		}
-
-		VS_FIXEDFILEINFO* verInfo = (VS_FIXEDFILEINFO*)lpBuffer;
-		if (verInfo->dwSignature != 0xfeef04bd)
-		{
-			RAIDHOOK_LOG_ERROR("Invalid version signature");
-			lua_pushstring(L, "0.0.0.0");
-			return 1;
-		}
-
-		std::string strVersion = std::format(
-			"{}.{}.{}.{}", (verInfo->dwFileVersionMS >> 16) & 0xFFFF, (verInfo->dwFileVersionMS >> 0) & 0xFFFF,
-			(verInfo->dwFileVersionLS >> 16) & 0xFFFF, (verInfo->dwFileVersionLS >> 0) & 0xFFFF);
-
-		lua_pushstring(L, strVersion.c_str());
+		lua_pushstring(L, blt::SBLT_VERSION);
 		return 1;
 	}
 

@@ -284,8 +284,7 @@ static UpdateCheckCacheState ReadCachedUpdateState()
 	if (!updateInfo)
 		return UpdateCheckCacheState::NEEDS_CHECK;
 
-	// TODO version
-	if (updateInfo->serverVersion != "1")
+	if (updateInfo->serverVersion != blt::SBLT_VERSION)
 	{
 		return UpdateCheckCacheState::UPDATE_PENDING;
 	}

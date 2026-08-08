@@ -172,55 +172,6 @@ namespace raidhook
 			return ss.str();
 		}
 
-		std::string GetDllVersion()
-		{
-			std::string ret = "0.0.0.0";
-			HMODULE hModule;
-			GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, reinterpret_cast<LPCTSTR>(GetFileHash), &hModule);
-			char path[MAX_PATH + 1];
-			size_t pathSize = GetModuleFileName(hModule, path, sizeof(path) - 1);
-			path[pathSize] = '\0';
-
-			DWORD verHandle = 0;
-			UINT size = 0;
-			LPBYTE lpBuffer = NULL;
-			uint32_t verSize = GetFileVersionInfoSize(path, &verHandle);
-
-			if (verSize == 0)
-			{
-				return ret;
-			}
-
-			std::string verData;
-			verData.resize(verSize);
-
-			if (!GetFileVersionInfo(path, verHandle, verSize, verData.data()))
-			{
-				return ret;
-			}
-
-			if (!VerQueryValue(verData.data(), "\\", (VOID FAR * FAR*)&lpBuffer, &size))
-			{
-				return ret;
-			}
-
-			if (size == 0)
-			{
-				return ret;
-			}
-
-			VS_FIXEDFILEINFO* verInfo = (VS_FIXEDFILEINFO*)lpBuffer;
-			if (verInfo->dwSignature != 0xfeef04bd)
-			{
-				return ret;
-			}
-
-			ret = std::format("{}.{}.{}.{}", (verInfo->dwFileVersionMS >> 16) & 0xFFFF,
-			                  (verInfo->dwFileVersionMS >> 0) & 0xFFFF, (verInfo->dwFileVersionLS >> 16) & 0xFFFF,
-			                  (verInfo->dwFileVersionLS >> 0) & 0xFFFF);
-			return ret;
-		}
-
 		std::string GetModuleFileNameCxx(HMODULE hModule)
 		{
 			std::string buffer(MAX_PATH, '\0');

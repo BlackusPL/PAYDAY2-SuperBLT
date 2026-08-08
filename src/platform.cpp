@@ -55,7 +55,7 @@ void blt::platform::InitPlatform()
 	if (std::filesystem::exists("updater/SBLT_DLL_UPDATER.exe"))
 	{
 		SetCurrentDirectory("updater");
-		int ret = system(std::format("SBLT_DLL_UPDATER.exe {}", raidhook::Util::GetDllVersion()).c_str());
+		int ret = system(std::format("SBLT_DLL_UPDATER.exe {}", blt::SBLT_VERSION).c_str());
 		SetCurrentDirectory("..");
 		if (ret == 1) // updater downloaded new dll version
 		{
