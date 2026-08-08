@@ -372,6 +372,16 @@ target_include_directories(wwise PUBLIC lib/ak_headers/include)
 
 target_link_libraries(SuperBLT wwise)
 
+### cJSON ###
+
+add_library(cJSON STATIC
+	lib/cJSON/cJSON.c
+	lib/cJSON/cJSON_Utils.c
+)
+target_include_directories(cJSON PUBLIC lib/cJSON)
+
+target_link_libraries(SuperBLT cJSON)
+
 
 ###############################################################################
 ## build external updater for dll                                            ##
