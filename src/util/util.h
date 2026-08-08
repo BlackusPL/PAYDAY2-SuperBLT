@@ -40,6 +40,7 @@ namespace raidhook
 		std::string GetDllVersion();
 
 		template <typename T> std::string ToHex(T num);
+		std::string StripWhitespace(std::string s);
 
 		// Wrapped Windows functions
 		std::string GetModuleFileNameCxx(HMODULE hModule);
@@ -169,6 +170,19 @@ namespace raidhook
 		};
 	} // namespace Logging
 
+	namespace Zip
+	{
+		struct ZIPFileData
+		{
+			std::string filepath;
+			std::string decompressedData;
+			int compressedSize;
+			int uncompressedSize;
+		};
+
+		std::vector<std::unique_ptr<ZIPFileData>> ReadZipFile(const uint8_t* data, size_t size);
+	} // namespace Zip
+
 	bool ExtractZIPArchive(const std::string& path, const std::string& extractPath);
 } // namespace raidhook
 
@@ -243,6 +257,11 @@ namespace raidhook
 namespace blt
 {
 	idstring idstring_hash(const std::string& text);
-}
+
+	// Thank you, Raymond Chen
+	// https://devblogs.microsoft.com/oldnewthing/20041025-00/?p=37483
+	EXTERN_C IMAGE_DOS_HEADER __ImageBase; // NOLINT(*-reserved-identifier)
+	static const HINSTANCE THIS_COMPONENT = (HINSTANCE)&__ImageBase; // NOLINT(*-misplaced-const)
+} // namespace blt
 
 #endif // __UTIL_HEADER__

@@ -231,5 +231,17 @@ namespace raidhook
 			return buffer;
 		}
 
+		std::string StripWhitespace(std::string s)
+		{
+			// Why on earth isn't this part of std?
+
+			// Trim from start (left)
+			s.erase(s.begin(), std::ranges::find_if(s, [](unsigned char ch) { return !std::isspace(ch); }));
+			// Trim from end (right)
+			s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch) { return !std::isspace(ch); }).base(),
+			        s.end());
+			return s;
+		}
+
 	} // namespace Util
 } // namespace raidhook
