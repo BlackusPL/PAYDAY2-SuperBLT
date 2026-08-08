@@ -383,6 +383,20 @@ target_include_directories(cJSON PUBLIC lib/cJSON)
 target_link_libraries(SuperBLT cJSON)
 
 
+# mldsa_native
+
+# We're using the C arithmatic backend. While I'd normally be pretty wary of this
+# due to the (albeit quite small due to ML-DSA's design) chance of timing sidechannel
+# attacks from a sufficiently smart C compiler, here we're only using the signature
+# verification API.
+add_library(mldsa_native STATIC
+	lib/mldsa-native/mldsa/mldsa_native.c
+)
+target_include_directories(mldsa_native PUBLIC lib/mldsa-native)
+
+target_link_libraries(SuperBLT mldsa_native)
+
+
 ###############################################################################
 ## build external updater for dll                                            ##
 ###############################################################################
