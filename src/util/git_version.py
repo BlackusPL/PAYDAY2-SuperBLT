@@ -1,5 +1,6 @@
 import argparse
 import subprocess
+import sys
 from pathlib import Path
 
 DIR = Path(__file__).parent
@@ -9,7 +10,8 @@ def get_git_version() -> str:
     result = subprocess.run(
         ["git", "describe", "--dirty=-dirty"],
         cwd=DIR,
-        capture_output=True,
+        stdout=subprocess.PIPE,
+        stderr=sys.stderr,  # If the command fails (particularly in CI) we want to know why
         text=True,
         check=True,
     )
