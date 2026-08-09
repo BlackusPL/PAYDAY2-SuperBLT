@@ -34,6 +34,10 @@ def main():
 #define SUPERBLT_VERSION_MACRO "{version}"
 """.strip() + "\n"
 
+    # Some build backends create the parent folders (eg Ninja), others seem not to (eg VS)
+    if not out.parent.exists():
+        out.parent.mkdir(parents=True)
+
     # Grab the current version of the file. If it matches what we were about
     # to write, then leave it alone to avoid updating the last-modified timestamp.
     # This means we won't unnecessarily re-compile anything.
@@ -43,7 +47,7 @@ def main():
             current_text = f.read()
 
     if current_text != new_text:
-        with open(args.out, 'w') as f:
+        with open(out, 'w') as f:
             f.write(new_text)
 
 
