@@ -65,4 +65,3 @@ jobs:
         path: |
           build/RelWithDebInfo/WSOCK32.dll
           build/RelWithDebInfo/WSOCK32.pdb
-          build/RelWithDebInfo/SBLT_DLL_UPDATER.exe

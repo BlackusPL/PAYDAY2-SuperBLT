@@ -407,12 +407,3 @@ add_library(mldsa_native STATIC
 target_include_directories(mldsa_native PUBLIC lib/mldsa-native)
 
 target_link_libraries(SuperBLT mldsa_native)
-
-
-###############################################################################
-## build external updater for dll                                            ##
-###############################################################################
-add_executable(SBLT_DLL_UPDATER updater/updater.cpp updater/compression.cpp updater/Resource.rc)
-target_link_libraries(SBLT_DLL_UPDATER crypt32.lib ws2_32.lib version.lib)
-target_link_libraries(SBLT_DLL_UPDATER psl zlib-ng libcurl_static)
-target_include_directories(SBLT_DLL_UPDATER PRIVATE updater)
