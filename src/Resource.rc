@@ -68,13 +68,13 @@ BEGIN
     BEGIN
         BLOCK "040904b0"
         BEGIN
-            VALUE "CompanyName", "RAID-SuperBLT"
-            VALUE "FileDescription", "RAID-SuperBLT"
+            VALUE "CompanyName", "PAYDAY2-SuperBLT"
+            VALUE "FileDescription", "PAYDAY2-SuperBLT"
             VALUE "FileVersion", SUPERBLT_VERSION_MACRO
-            VALUE "InternalName", "RAID-SuperBLT.dll"
+            VALUE "InternalName", "PAYDAY2-SuperBLT.dll"
             VALUE "LegalCopyright", "Copyright (C) 2026"
-            VALUE "OriginalFilename", "RAID-SuperBLT.dll"
-            VALUE "ProductName", "RAID-SuperBLT"
+            VALUE "OriginalFilename", "PAYDAY2-SuperBLT.dll"
+            VALUE "ProductName", "PAYDAY2-SuperBLT"
             VALUE "ProductVersion", SUPERBLT_VERSION_MACRO
         END
     END
