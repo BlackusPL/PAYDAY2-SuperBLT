@@ -237,7 +237,7 @@ static bool FindAssetLoadSignatures(const char* module, SignatureCacheDB& cache,
 						  "\x6C\x24\xE9\x48\x81\xEC\xE0\x00\x00\x00\x49";
 	const char* mask = "xxxxxxxxxxxxxxxxxxxxxxxxxxxx";
 	// There should be three copies of this function
-	int target_count = 3;
+	int target_count = 2;
 
 	MODULEINFO mInfo = GetModuleInfo(module);
 	size_t base = (size_t)mInfo.lpBaseOfDll;
