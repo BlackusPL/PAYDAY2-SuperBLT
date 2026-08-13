@@ -1,5 +1,9 @@
 # PAYDAY2-SuperBLT (64 Bit) ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/diesel-modding/PAYDAY2-SuperBLT/create_build.yml)
 
+> [!WARNING]
+> 
+> This repo is no longer maintained, go to [official repo](https://github.com/diesel-modding/PAYDAY2-SuperBLT) or [modworkshop page](https://modworkshop.net/mod/58342)
+
 An open-source Lua hook for PAYDAY 2, designed and created for ease of use for both players and modders.
 
 This is an unofficial continuation of the BLT and SuperBLT mod loader for PAYDAY 2, with additional features aimed at allowing things
